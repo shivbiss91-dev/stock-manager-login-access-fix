@@ -230,6 +230,28 @@ export class StorageService {
     this.seedDemoWorkspace(true);
   }
 
+  static getProduction<T>(key: string, defaultValue: T): T {
+    try {
+      this.init();
+      const storage = this.getStorage();
+      const raw = storage.getItem(key);
+      if (raw === null) return defaultValue;
+      return JSON.parse(raw) as T;
+    } catch {
+      return defaultValue;
+    }
+  }
+
+  static setProduction<T>(key: string, value: T): void {
+    try {
+      this.init();
+      const storage = this.getStorage();
+      storage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(`Failed to persist production key "${key}":`, e);
+    }
+  }
+
   static get<T>(key: string, defaultValue: T): T {
     try {
       this.init();

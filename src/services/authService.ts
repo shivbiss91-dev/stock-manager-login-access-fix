@@ -26,16 +26,27 @@ function sanitizeUser(account: UserAccount): User {
 const phoneOtpStore = new Map<string, { code: string; expiresAt: number; phone: string }>();
 
 export const authService = {
+  hasAdminSync(): boolean {
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    return Array.isArray(users) && users.some((u) => u.role === 'admin' && !u.isDemo);
+  },
+
+  async hasAdmin(): Promise<boolean> {
+    return this.hasAdminSync();
+  },
+
   async hasUsers(): Promise<boolean> {
-    const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     return Array.isArray(users) && users.length > 0;
   },
 
   async createInitialAdmin(input: InitialAdminInput): Promise<AuthSession> {
     await new Promise((res) => setTimeout(res, 200));
 
-    const existingUsers = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
-    if (existingUsers.length > 0) {
+    const existingUsers = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const hasExistingAdmin =
+      Array.isArray(existingUsers) && existingUsers.some((u) => u.role === 'admin' && !u.isDemo);
+    if (hasExistingAdmin) {
       throw new Error('Initial administrator account already exists. Please log in with existing credentials.');
     }
 
@@ -49,11 +60,19 @@ export const authService = {
       throw new Error('Password must be at least 4 characters long.');
     }
 
+    const normalizedEmail = input.email.trim().toLowerCase();
+    if (
+      Array.isArray(existingUsers) &&
+      existingUsers.some((u) => u.email.toLowerCase() === normalizedEmail)
+    ) {
+      throw new Error('An account with this email address already exists. Please use a different email or log in.');
+    }
+
     const now = new Date().toISOString();
     const adminUser: UserAccount = {
       id: 'usr-admin-01',
       name: input.name.trim(),
-      email: input.email.trim().toLowerCase(),
+      email: normalizedEmail,
       role: 'admin',
       roleTitle: 'System Administrator',
       phone: input.phone?.trim() || '+91 98000 00000',
@@ -69,7 +88,8 @@ export const authService = {
       createdAt: now,
     };
 
-    StorageService.set(STORAGE_KEYS.USERS, [adminUser]);
+    const nextUsers = Array.isArray(existingUsers) ? [adminUser, ...existingUsers] : [adminUser];
+    StorageService.setProduction(STORAGE_KEYS.USERS, nextUsers);
 
     const session: AuthSession = {
       user: sanitizeUser(adminUser),
@@ -84,7 +104,7 @@ export const authService = {
   async login(email: string, passwordHash: string): Promise<LoginResult> {
     await new Promise((res) => setTimeout(res, 180));
 
-    const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     if (!Array.isArray(users) || users.length === 0) {
       throw new Error('No administrator account has been created yet. Create the initial administrator account first.');
     }
@@ -121,7 +141,7 @@ export const authService = {
     // Update lastLogin & preferredLoginMethod
     userAccount.lastLogin = new Date().toISOString();
     userAccount.preferredLoginMethod = 'email_password';
-    StorageService.set(STORAGE_KEYS.USERS, users);
+    StorageService.setProduction(STORAGE_KEYS.USERS, users);
 
     const session: AuthSession = {
       user: sanitizeUser(userAccount),

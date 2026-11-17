@@ -69,7 +69,6 @@ export const LoginPage: React.FC = () => {
   } = useAuthStore();
 
   const [selectedRoleTab, setSelectedRoleTab] = useState<'admin' | 'staff'>('admin');
-  const [isCreatingAccount, setIsCreatingAccount] = useState<boolean>(false);
   const [staffLoginMethod, setStaffLoginMethod] = useState<LoginMethod>('google');
 
   // Staff Google OAuth form state
@@ -86,15 +85,15 @@ export const LoginPage: React.FC = () => {
   // Common UI states
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [isFreshInstall, setIsFreshInstall] = useState<boolean | null>(null);
-  const [isDemoAvailable, setIsDemoAvailable] = useState(false);
+  const [hasAdminAccount, setHasAdminAccount] = useState<boolean>(() => authService.hasAdminSync());
+  const [isDemoAvailable, setIsDemoAvailable] = useState<boolean>(() => authService.isDemoLoginConfigured());
 
-  // Check if system has any registered accounts and demo mode availability
+  // Sync whether an initial administrator account exists and demo mode availability
   useEffect(() => {
     let isMounted = true;
-    authService.hasUsers().then((has) => {
+    authService.hasAdmin().then((hasAdmin) => {
       if (isMounted) {
-        setIsFreshInstall(!has);
+        setHasAdminAccount(hasAdmin);
         setIsDemoAvailable(authService.isDemoLoginConfigured());
       }
     });
@@ -145,7 +144,10 @@ export const LoginPage: React.FC = () => {
         navigate(from, { replace: true });
       }
     } catch {
-      // Handled in authStore
+      const exists = await authService.hasAdmin();
+      if (!exists) {
+        setHasAdminAccount(false);
+      }
     }
   };
 
@@ -158,9 +160,13 @@ export const LoginPage: React.FC = () => {
         phone: data.phone,
         password: data.password,
       });
+      setHasAdminAccount(true);
       navigate('/dashboard', { replace: true });
     } catch {
-      // Handled in authStore
+      const exists = await authService.hasAdmin();
+      if (exists) {
+        setHasAdminAccount(true);
+      }
     }
   };
 
@@ -218,7 +224,7 @@ export const LoginPage: React.FC = () => {
     navigate(from, { replace: true });
   };
 
-  const isShowingSetup = isFreshInstall === true || isCreatingAccount;
+  const isShowingSetup = !hasAdminAccount;
 
   return (
     <div className="min-h-screen flex bg-[#F4F7FA] dark:bg-[#05060A] text-slate-800 dark:text-[#F2F4F8] transition-colors relative overflow-hidden">
@@ -455,23 +461,6 @@ export const LoginPage: React.FC = () => {
                     >
                       Create Account & Sign In
                     </Button>
-
-                    {/* Link to return to Sign In */}
-                    {isFreshInstall !== true && (
-                      <div className="pt-2 text-center text-xs text-slate-500 dark:text-slate-400">
-                        <span>Already have an account? </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            clearError();
-                            setIsCreatingAccount(false);
-                          }}
-                          className="font-bold text-accent-orange hover:underline focus:outline-none"
-                        >
-                          Sign In
-                        </button>
-                      </div>
-                    )}
                   </form>
                 </div>
               ) : (
@@ -542,19 +531,11 @@ export const LoginPage: React.FC = () => {
                       Sign In (Production Access)
                     </Button>
 
-                    {/* REPLACED STATEMENT: "Create a new account" option */}
+                    {/* Guidance when an initial administrator account is already configured */}
                     <div className="pt-3 border-t border-slate-200 dark:border-white/[0.08] text-center text-xs text-slate-500 dark:text-slate-400">
-                      <span>Don't have an account? </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          clearError();
-                          setIsCreatingAccount(true);
-                        }}
-                        className="font-bold text-accent-orange hover:underline focus:outline-none"
-                      >
-                        Create a new account
-                      </button>
+                      <span>
+                        An administrator account is already set up for this workspace. Please sign in with your existing administrator email and password.
+                      </span>
                     </div>
                   </form>
                 </div>
