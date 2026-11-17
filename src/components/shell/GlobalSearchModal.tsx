@@ -9,7 +9,6 @@ import {
   FileText,
   Users,
   Warehouse as WarehouseIcon,
-  CheckSquare,
   History,
   X,
 } from 'lucide-react';
@@ -64,14 +63,6 @@ const QUICK_SEARCH_ITEMS: SearchItem[] = [
     category: 'Page',
     path: '/warehouses',
     icon: <WarehouseIcon className="w-4 h-4 text-blue-500" />,
-  },
-  {
-    id: 's-6',
-    title: 'Approval Requests',
-    subtitle: 'Review price modifications, discounts & inventory adjustments',
-    category: 'Page',
-    path: '/approvals',
-    icon: <CheckSquare className="w-4 h-4 text-purple-500" />,
   },
   {
     id: 's-7',

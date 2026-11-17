@@ -10,7 +10,6 @@ import {
   ChevronDown,
   UserCheck,
   Users,
-  Settings,
   ExternalLink,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -30,7 +29,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { user, logout, switchRole, canSwitchRole, hasModulePermission } = useAuthStore();
+  const { user, logout, switchRole, canSwitchRole } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const [isOpen, setIsOpen] = useState(false);
   const [showRoleSubmenu, setShowRoleSubmenu] = useState(false);
@@ -258,21 +257,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
                   <div className="flex items-center gap-2.5">
                     <Users className="w-4 h-4 text-brand-orange" />
                     <span>Staff Management</span>
-                  </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-200 transition-colors" />
-                </button>
-              )}
-
-              {/* Quick Navigation: Company & System Settings */}
-              {(user.role === 'admin' || hasModulePermission('module_settings')) && (
-                <button
-                  type="button"
-                  onClick={() => handleNavigate('/settings')}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-xl text-slate-700 dark:text-[#F2F4F8] hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Settings className="w-4 h-4 text-blue-400" />
-                    <span>Company Settings</span>
                   </div>
                   <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-200 transition-colors" />
                 </button>

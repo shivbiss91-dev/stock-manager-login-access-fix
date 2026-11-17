@@ -3,12 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
-  BarChart3,
-  CheckSquare,
   UserCog,
-  ShieldAlert,
   DatabaseBackup,
-  Settings,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -60,32 +56,10 @@ export const Sidebar: React.FC = () => {
       icon: <Package className="w-5 h-5" strokeWidth={1.5} />,
     },
     {
-      id: 'reports',
-      label: t('nav.reports', 'Reports & Analytics'),
-      path: '/reports',
-      moduleId: 'module_reports',
-      allowedRoles: ['admin', 'manager', 'staff', 'viewer'],
-      icon: <BarChart3 className="w-5 h-5" strokeWidth={1.5} />,
-    },
-    {
-      id: 'approvals',
-      label: t('nav.approvals', 'Approvals'),
-      path: '/approvals',
-      allowedRoles: ['admin', 'manager'],
-      icon: <CheckSquare className="w-5 h-5" strokeWidth={1.5} />,
-    },
-    {
       id: 'users-roles',
       label: t('nav.users_roles', 'Users & Roles'),
       path: '/users-roles',
       icon: <UserCog className="w-5 h-5" strokeWidth={1.5} />,
-      allowedRoles: ['admin'],
-    },
-    {
-      id: 'audit-log',
-      label: t('nav.audit_log', 'Audit Log'),
-      path: '/audit-log',
-      icon: <ShieldAlert className="w-5 h-5" strokeWidth={1.5} />,
       allowedRoles: ['admin'],
     },
     {
@@ -94,14 +68,6 @@ export const Sidebar: React.FC = () => {
       path: '/backup',
       icon: <DatabaseBackup className="w-5 h-5" strokeWidth={1.5} />,
       allowedRoles: ['admin'],
-    },
-    {
-      id: 'settings',
-      label: t('nav.settings', 'Settings'),
-      path: '/settings',
-      moduleId: 'module_settings',
-      allowedRoles: ['admin', 'manager', 'staff'],
-      icon: <Settings className="w-5 h-5" strokeWidth={1.5} />,
     },
   ];
 
