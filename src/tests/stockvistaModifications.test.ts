@@ -323,82 +323,24 @@ describe('StockVista Modifications & Hardening Test Suite', () => {
     });
   });
 
-  describe('Feature: Sweedal – One-Click Demo Admin Login & Workspace Isolation', () => {
+  describe('Feature: Demo Admin Login Disabled', () => {
     afterEach(() => {
       authService.logout();
     });
 
-    it('logs in immediately as Sweedal – Demo Admin without requiring any credentials', async () => {
-      const session = await authService.loginDemoAdmin();
-      expect(session).toBeDefined();
-      expect(session.user.name).toBe('Sweedal – Demo Admin');
-      expect(session.user.role).toBe('admin');
-      expect(session.user.isDemo).toBe(true);
+    it('permanently disables Demo Admin login and clears any legacy demo session', async () => {
+      expect(authService.isDemoLoginConfigured()).toBe(false);
+      await expect(authService.loginDemoAdmin()).rejects.toThrow('Demo Admin login has been disabled.');
 
-      const currentUser = authService.getCurrentSession()?.user;
-      expect(currentUser?.isDemo).toBe(true);
-      expect(authService.isDemoSession()).toBe(true);
-      expect(StorageService.isDemoActive()).toBe(true);
-    });
+      StorageService.set(STORAGE_KEYS.SESSION, {
+        user: { id: 'usr-demo-sweedal-01', name: 'Sweedal – Demo Admin', role: 'admin', isDemo: true },
+        token: 'demo_token',
+        expiresAt: Date.now() + 60_000,
+        isDemo: true,
+      });
 
-    it('populates demo workspace with 4 official products and operational sample data', async () => {
-      await authService.loginDemoAdmin();
-
-      const items = await inventoryService.getAllItems();
-      expect(items.length).toBe(4);
-      const names = items.map(i => i.name);
-      expect(names).toContain('Card Holder');
-      expect(names).toContain('Lanyard');
-      expect(names).toContain('Hook');
-      expect(names).toContain('Button Bag');
-
-      for (const item of items) {
-        expect(item.currentStock).toBeGreaterThan(0);
-        expect(item.sellingPrice).toBeGreaterThan(0);
-      }
-    });
-
-    it('strictly isolates demo data from production records', async () => {
-      authService.logout();
-      expect(StorageService.isDemoActive()).toBe(false);
-
-      StorageService.set('items', [{ id: 'prod-item-1', name: 'Real Business Product', currentStock: 999 }]);
-
-      await authService.loginDemoAdmin();
-      expect(StorageService.isDemoActive()).toBe(true);
-
-      const demoItems = await inventoryService.getAllItems();
-      expect(demoItems.some(i => i.name === 'Real Business Product')).toBe(false);
-      expect(demoItems.length).toBe(4);
-
-      const cardHolder = demoItems.find(i => i.name === 'Card Holder');
-      if (cardHolder) {
-        await inventoryService.updateItem(cardHolder.id, { currentStock: 9999 });
-      }
-
-      authService.logout();
-      expect(StorageService.isDemoActive()).toBe(false);
-
-      const prodItems = StorageService.get<any[]>('items', []);
-      expect(prodItems.length).toBe(1);
-      expect(prodItems[0].name).toBe('Real Business Product');
-      expect(prodItems[0].currentStock).toBe(999);
-    });
-
-    it('allows resetting demo data back to original sample records', async () => {
-      await authService.loginDemoAdmin();
-
-      const itemsBefore = await inventoryService.getAllItems();
-      const firstId = itemsBefore[0].id;
-      await inventoryService.deleteItem(firstId);
-
-      const itemsAfterDelete = await inventoryService.getAllItems();
-      expect(itemsAfterDelete.length).toBe(3);
-
-      StorageService.resetDemoWorkspace();
-
-      const itemsAfterReset = await inventoryService.getAllItems();
-      expect(itemsAfterReset.length).toBe(4);
+      expect(authService.getCurrentSession()).toBeNull();
+      expect(authService.isDemoSession()).toBe(false);
     });
   });
 });

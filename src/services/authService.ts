@@ -429,19 +429,21 @@ export const authService = {
     try {
       const session = StorageService.get<AuthSession | null>(STORAGE_KEYS.SESSION, null);
       if (!session) return null;
+      if (session.isDemo || session.user?.isDemo) {
+        StorageService.remove(STORAGE_KEYS.SESSION);
+        return null;
+      }
       if (Date.now() > session.expiresAt) {
         StorageService.remove(STORAGE_KEYS.SESSION);
         return null;
       }
 
       // If user account in users table is deactivated, revoke immediately
-      if (!session.isDemo) {
-        const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
-        const account = users.find((u) => u.id === session.user.id);
-        if (account && (account.status === 'deactivated' || account.status === 'suspended')) {
-          StorageService.remove(STORAGE_KEYS.SESSION);
-          return null;
-        }
+      const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+      const account = users.find((u) => u.id === session.user.id);
+      if (account && (account.status === 'deactivated' || account.status === 'suspended')) {
+        StorageService.remove(STORAGE_KEYS.SESSION);
+        return null;
       }
 
       return session;
@@ -455,63 +457,15 @@ export const authService = {
   },
 
   isDemoSession(): boolean {
-    return StorageService.isDemoActive();
+    return false;
   },
 
   isDemoLoginConfigured(): boolean {
-    if (import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'false') {
-      return false;
-    }
-    if (import.meta.env.PROD) {
-      if (import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true') {
-        return true;
-      }
-      if (
-        typeof window !== 'undefined' &&
-        (window.location.hostname.endsWith('github.io') ||
-          window.location.hostname === 'localhost' ||
-          window.location.hostname === '127.0.0.1')
-      ) {
-        return true;
-      }
-      return false;
-    }
-    return true;
+    return false;
   },
 
   async loginDemoAdmin(): Promise<AuthSession> {
-    if (!this.isDemoLoginConfigured()) {
-      throw new Error(
-        'Sweedal – Demo Admin Login is disabled in production or this environment is not an enabled demo environment.'
-      );
-    }
-
-    StorageService.seedDemoWorkspace();
-
-    const demoUser: User = {
-      id: 'usr-demo-sweedal-01',
-      name: 'Sweedal – Demo Admin',
-      email: 'sweedal.demo@stockvista.internal',
-      role: 'admin',
-      roleTitle: 'Demonstration Administrator (Demo Workspace)',
-      phone: '+91 98000 00000',
-      status: 'active',
-      isDemo: true,
-      lastLogin: new Date().toISOString(),
-      warehouseId: 'all',
-      warehouseName: 'All Demo Facilities',
-      permissions: [...DEFAULT_ROLE_MODULES.admin],
-    };
-
-    const session: AuthSession = {
-      user: demoUser,
-      token: `demo_sweedal_${Date.now()}`,
-      expiresAt: Date.now() + 8 * 60 * 60 * 1000,
-      isDemo: true,
-    };
-
-    StorageService.set(STORAGE_KEYS.SESSION, session);
-    return session;
+    throw new Error('Demo Admin login has been disabled.');
   },
 
   async switchRole(role: Role): Promise<User> {

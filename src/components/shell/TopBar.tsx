@@ -51,12 +51,6 @@ export const TopBar: React.FC = () => {
             <div className="hidden lg:block min-w-0">
               <Breadcrumbs />
             </div>
-            {user?.isDemo && (
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[10px] font-extrabold uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span>Sweedal – Demo Admin</span>
-              </div>
-            )}
           </div>
         </div>
 

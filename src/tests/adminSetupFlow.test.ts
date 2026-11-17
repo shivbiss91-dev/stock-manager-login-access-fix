@@ -81,7 +81,7 @@ describe('Administrator Login & Initial Setup Flow', () => {
     expect(users.some((u) => u.email === 'staff.member@gmail.com' && u.role === 'staff')).toBe(true);
   });
 
-  it('still detects the existing production admin even while a demo session is active', async () => {
+  it('still detects the existing production admin even if a legacy demo session exists in storage', async () => {
     await authService.createInitialAdmin({
       name: 'Real Admin',
       email: 'real.admin@company.in',
@@ -89,11 +89,16 @@ describe('Administrator Login & Initial Setup Flow', () => {
       password: 'RealPassword@1',
     });
 
-    await authService.loginDemoAdmin();
-    expect(StorageService.isDemoActive()).toBe(true);
+    StorageService.set(STORAGE_KEYS.SESSION, {
+      user: { id: 'usr-demo-sweedal-01', name: 'Sweedal – Demo Admin', role: 'admin', isDemo: true },
+      token: 'legacy_demo',
+      expiresAt: Date.now() + 60_000,
+      isDemo: true,
+    });
 
     expect(authService.hasAdminSync()).toBe(true);
     expect(await authService.hasAdmin()).toBe(true);
+    expect(authService.getCurrentSession()).toBeNull();
 
     const loginResult = await authService.login('real.admin@company.in', 'RealPassword@1');
     expect(loginResult.user?.email).toBe('real.admin@company.in');

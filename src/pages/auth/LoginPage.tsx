@@ -21,8 +21,6 @@ import {
   UserCheck,
   Phone,
   User as UserIcon,
-  PlayCircle,
-  Zap,
   KeyRound,
   CheckCircle2,
   Smartphone,
@@ -60,7 +58,6 @@ export const LoginPage: React.FC = () => {
     loginWithGoogle,
     sendPhoneOtp,
     verifyPhoneOtp,
-    loginDemoAdmin,
     createInitialAdmin,
     isLoading,
     error,
@@ -86,15 +83,13 @@ export const LoginPage: React.FC = () => {
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [hasAdminAccount, setHasAdminAccount] = useState<boolean>(() => authService.hasAdminSync());
-  const [isDemoAvailable, setIsDemoAvailable] = useState<boolean>(() => authService.isDemoLoginConfigured());
 
-  // Sync whether an initial administrator account exists and demo mode availability
+  // Sync whether an initial administrator account exists
   useEffect(() => {
     let isMounted = true;
     authService.hasAdmin().then((hasAdmin) => {
       if (isMounted) {
         setHasAdminAccount(hasAdmin);
-        setIsDemoAvailable(authService.isDemoLoginConfigured());
       }
     });
     return () => {
@@ -103,16 +98,6 @@ export const LoginPage: React.FC = () => {
   }, []);
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
-
-  const handleDemoLogin = async () => {
-    clearError();
-    try {
-      await loginDemoAdmin();
-      navigate(from, { replace: true });
-    } catch {
-      // Handled in authStore
-    }
-  };
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -324,64 +309,11 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* ============================================================ */}
-          {/* TAB 1: ADMIN FLOW (DEMO ADMIN + ACTUAL ADMIN LOGIN)          */}
+          {/* TAB 1: ADMIN FLOW                                            */}
           {/* ============================================================ */}
           {selectedRoleTab === 'admin' && (
             <div className="space-y-6">
-              {/* EXPERIENCE B: SEPARATE DEMO ADMIN OPTION (SWEEDAL – DEMO ADMIN) */}
-              {isDemoAvailable && (
-                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-500/[0.12] via-brand-orange/[0.08] to-slate-900/40 border-2 border-amber-500/40 dark:border-amber-500/30 shadow-lg relative overflow-hidden group">
-                  <div className="flex items-start justify-between gap-3 mb-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-brand-orange text-slate-950 flex items-center justify-center shadow-md font-extrabold flex-shrink-0">
-                        <Zap className="w-5 h-5 fill-current" />
-                      </div>
-                      <div>
-                        <h3 className="text-base font-extrabold text-slate-900 dark:text-[#F2F4F8] flex items-center gap-2">
-                          <span>Sweedal – Demo Admin</span>
-                        </h3>
-                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          One-Click Demo Workspace
-                        </span>
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold border border-amber-500/30">
-                      Instant Access
-                    </span>
-                  </div>
-
-                  <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed mb-3.5">
-                    Explore a complete interactive demo workspace pre-loaded with sample Card Holders, Lanyards, Hooks, Button Bags, invoices, orders, and warehouses. <strong>No username, password, or OTP required.</strong>
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={handleDemoLogin}
-                    disabled={isLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-[#FF6B35] to-[#E85924] hover:from-amber-600 hover:to-[#D44A17] text-white font-extrabold text-xs tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-                  >
-                    <PlayCircle className="w-4 h-4 fill-white/20" />
-                    <span>Launch Sweedal – Demo Admin Workspace</span>
-                    <ArrowRight className="w-4 h-4 ml-auto" />
-                  </button>
-
-                  <div className="mt-2 text-[10.5px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                    <span>• Isolated sandboxed storage</span>
-                    <span>• Production data protected</span>
-                  </div>
-                </div>
-              )}
-
-              {/* DIVIDER BETWEEN EXPERIENCES */}
-              <div className="relative flex items-center justify-center">
-                <div className="w-full border-t border-slate-200 dark:border-white/[0.08]" />
-                <span className="absolute bg-[#F4F7FA] dark:bg-[#05060A] px-3 text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-                  Actual Business Login
-                </span>
-              </div>
-
-              {/* EXPERIENCE A: CREATE NEW ACCOUNT vs SIGN IN */}
+              {/* CREATE NEW ACCOUNT vs SIGN IN */}
               {isShowingSetup ? (
                 /* Create a New Account Flow */
                 <div className="space-y-5">
