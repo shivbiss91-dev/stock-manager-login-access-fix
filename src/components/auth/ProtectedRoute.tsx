@@ -22,23 +22,32 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const location = useLocation();
   const { isAuthenticated, user, hasPermission, logout } = useAuthStore();
 
+  const liveAccount = isAuthenticated && user && !user.isDemo
+    ? userService.getUserByIdSync(user.id)
+    : null;
+  const isAccountRevoked = Boolean(
+    liveAccount && (liveAccount.status === 'deactivated' || liveAccount.status === 'suspended')
+  );
+
+  useEffect(() => {
+    if (isAccountRevoked) {
+      logout();
+    }
+  }, [isAccountRevoked, logout]);
+
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Real-time deactivation enforcement: If account was deactivated by Admin, immediately revoke session
-  if (!user.isDemo) {
-    const liveAccount = userService.getUserByIdSync(user.id);
-    if (liveAccount && (liveAccount.status === 'deactivated' || liveAccount.status === 'suspended')) {
-      logout();
-      return (
-        <Navigate
-          to="/login"
-          state={{ error: 'Your account has been deactivated by the administrator. Session revoked.' }}
-          replace
-        />
-      );
-    }
+  if (isAccountRevoked) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ error: 'Your account has been deactivated by the administrator. Session revoked.' }}
+        replace
+      />
+    );
   }
 
   // Check role restrictions if specified

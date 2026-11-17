@@ -101,19 +101,31 @@ export const authService = {
     return session;
   },
 
-  async login(email: string, passwordHash: string): Promise<LoginResult> {
+  async login(email: string, passwordHash: string, rememberMe = true): Promise<LoginResult> {
     await new Promise((res) => setTimeout(res, 180));
 
     const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     if (!Array.isArray(users) || users.length === 0) {
       throw new Error('No administrator account has been created yet. Create the initial administrator account first.');
     }
+    const normalizedEmail = email.trim().toLowerCase();
     const userAccount = users.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase()
+      (u) => (u.email || '').trim().toLowerCase() === normalizedEmail
     );
 
     if (!userAccount) {
       throw new Error('Invalid email address or user account does not exist.');
+    }
+
+    if (
+      userAccount.passwordHash === 'google_oauth_auth_token' ||
+      userAccount.passwordHash === 'phone_otp_auth_token'
+    ) {
+      throw new Error(
+        userAccount.passwordHash === 'google_oauth_auth_token'
+          ? 'This account uses Google Sign-In on the Staff tab and does not have a password.'
+          : 'This account uses Phone OTP Sign-In on the Staff tab and does not have a password.'
+      );
     }
 
     if (userAccount.passwordHash !== passwordHash) {
@@ -143,10 +155,14 @@ export const authService = {
     userAccount.preferredLoginMethod = 'email_password';
     StorageService.setProduction(STORAGE_KEYS.USERS, users);
 
+    const sessionDurationMs = rememberMe
+      ? 7 * 24 * 60 * 60 * 1000 // 7 days
+      : 8 * 60 * 60 * 1000; // 8 hours
+
     const session: AuthSession = {
       user: sanitizeUser(userAccount),
       token: `token_${userAccount.id}_${Date.now()}`,
-      expiresAt: Date.now() + 8 * 60 * 60 * 1000, // 8 hours
+      expiresAt: Date.now() + sessionDurationMs,
     };
 
     StorageService.set(STORAGE_KEYS.SESSION, session);
@@ -378,9 +394,9 @@ export const authService = {
   async verifyOtp(email: string, otpCode: string): Promise<AuthSession> {
     await new Promise((res) => setTimeout(res, 200));
 
-    const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const userAccount = users.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase()
+      (u) => (u.email || '').trim().toLowerCase() === email.trim().toLowerCase()
     );
 
     if (!userAccount) {
@@ -392,7 +408,7 @@ export const authService = {
     }
 
     userAccount.lastLogin = new Date().toISOString();
-    StorageService.set(STORAGE_KEYS.USERS, users);
+    StorageService.setProduction(STORAGE_KEYS.USERS, users);
 
     const session: AuthSession = {
       user: sanitizeUser(userAccount),
@@ -404,7 +420,7 @@ export const authService = {
     return session;
   },
 
-  async resendOtp(email: string): Promise<{ success: boolean; message: string }> {
+  async resendOtp(_email: string): Promise<{ success: boolean; message: string }> {
     await new Promise((res) => setTimeout(res, 150));
     return {
       success: true,
@@ -414,15 +430,14 @@ export const authService = {
 
   async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
     await new Promise((res) => setTimeout(res, 180));
-    const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
-    const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const user = users.find((u) => (u.email || '').trim().toLowerCase() === email.trim().toLowerCase());
     if (!user) {
       throw new Error('No registered account found with this email address.');
     }
-    return {
-      success: true,
-      message: `Password reset instructions have been dispatched to ${email}`,
-    };
+    throw new Error(
+      'Password recovery is not available because no backend server or email delivery service is configured for this app.'
+    );
   },
 
   getCurrentSession(): AuthSession | null {
@@ -468,10 +483,25 @@ export const authService = {
     throw new Error('Demo Admin login has been disabled.');
   },
 
+  canSwitchRole(userId?: string): boolean {
+    if (!userId) return false;
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const account = users.find((u) => u.id === userId);
+    if (account) {
+      return account.role === 'admin';
+    }
+    const session = this.getCurrentSession();
+    return session?.user?.id === userId && session.user.role === 'admin';
+  },
+
   async switchRole(role: Role): Promise<User> {
     const session = this.getCurrentSession();
     if (!session || !session.user) {
       throw new Error('No active session.');
+    }
+
+    if (!this.canSwitchRole(session.user.id)) {
+      throw new Error('Unauthorized. Only administrators can switch test roles.');
     }
 
     const updatedUser: User = {

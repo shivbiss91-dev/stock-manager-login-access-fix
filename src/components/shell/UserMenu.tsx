@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User as UserIcon,
   Sun,
   Moon,
   Globe,
@@ -10,15 +9,12 @@ import {
   ShieldCheck,
   ChevronDown,
   UserCheck,
-  RotateCcw,
   Users,
   Settings,
-  Sparkles,
   ExternalLink,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
-import { StorageService } from '../../services/storageService';
 import { Role } from '../../types/auth';
 import { changeAppLanguage, SUPPORTED_LANGUAGES } from '../../i18n';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +30,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { user, logout, switchRole, hasModulePermission } = useAuthStore();
+  const { user, logout, switchRole, canSwitchRole, hasModulePermission } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const [isOpen, setIsOpen] = useState(false);
   const [showRoleSubmenu, setShowRoleSubmenu] = useState(false);
@@ -106,18 +102,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     setShowLangSubmenu(false);
     logout();
     navigate('/login');
-  };
-
-  const handleResetDemoData = () => {
-    setIsOpen(false);
-    if (
-      window.confirm(
-        'Reset all demo inventory, invoices, and orders back to initial sample state? This will only affect demo data.'
-      )
-    ) {
-      StorageService.resetDemoWorkspace();
-      window.location.reload();
-    }
   };
 
   const initial = (user.name || 'User').charAt(0).toUpperCase();
@@ -247,11 +231,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
                     <p className="text-xs font-bold text-slate-900 dark:text-[#F2F4F8] truncate">
                       {user.name}
                     </p>
-                    {user.isDemo && (
-                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                        Demo
-                      </span>
-                    )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-[#9AA0AE] truncate mt-0.5">
                     {user.email}
@@ -359,7 +338,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
               </div>
 
               {/* Role switcher (ERP Testing - Admin and Staff only, no Manager) */}
-              {user.role === 'admin' && (
+              {canSwitchRole() && (
                 <div>
                   <button
                     type="button"
@@ -406,19 +385,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
                 </div>
               )}
 
-              {/* Reset Demo Data (Visible strictly in Demo Mode) */}
-              {user.isDemo && (
-                <button
-                  type="button"
-                  onClick={handleResetDemoData}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
-                  title="Reset sample inventory and transactions"
-                >
-                  <RotateCcw className="w-4 h-4 text-amber-500" />
-                  <span>Reset Demo Data</span>
-                </button>
-              )}
-
               <div className="border-t border-slate-100 dark:border-white/[0.06] my-1 pt-1" />
 
               {/* Logout */}
@@ -428,7 +394,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                <span>{user.isDemo ? 'Exit Demo Session' : t('topbar.logout', 'Sign Out')}</span>
+                <span>{t('topbar.logout', 'Sign Out')}</span>
               </button>
             </div>
           </motion.div>

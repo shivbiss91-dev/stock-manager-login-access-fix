@@ -19,7 +19,7 @@ interface AuthStore {
   otpPendingEmail: string | null;
   otpMaskedPhone: string | null;
 
-  login: (email: string, passwordHash: string) => Promise<{ requiresOtp: boolean }>;
+  login: (email: string, passwordHash: string, rememberMe?: boolean) => Promise<{ requiresOtp: boolean }>;
   loginWithGoogle: (email: string, name?: string, role?: Role) => Promise<void>;
   sendPhoneOtp: (phone: string) => Promise<{ otpCode: string; isNewUser: boolean; message: string }>;
   verifyPhoneOtp: (phone: string, otpCode: string, name?: string, role?: Role) => Promise<void>;
@@ -29,6 +29,7 @@ interface AuthStore {
   resendOtp: () => Promise<string>;
   forgotPassword: (email: string) => Promise<string>;
   logout: () => void;
+  canSwitchRole: () => boolean;
   switchRole: (role: Role) => Promise<void>;
   hasPermission: (permission: PermissionAction) => boolean;
   hasModulePermission: (module: AppPermissionModule) => boolean;
@@ -49,10 +50,10 @@ export const useAuthStore = create<AuthStore>((set, get) => {
     otpPendingEmail: null,
     otpMaskedPhone: null,
 
-    login: async (email: string, passwordHash: string) => {
+    login: async (email: string, passwordHash: string, rememberMe = true) => {
       set({ isLoading: true, error: null });
       try {
-        const result = await authService.login(email, passwordHash);
+        const result = await authService.login(email, passwordHash, rememberMe);
         if (result.requiresOtp) {
           set({
             isLoading: false,
@@ -211,10 +212,16 @@ export const useAuthStore = create<AuthStore>((set, get) => {
       });
     },
 
+    canSwitchRole: () => {
+      const { user } = get();
+      if (!user) return false;
+      return authService.canSwitchRole(user.id);
+    },
+
     switchRole: async (role: Role) => {
       const { user } = get();
-      // Security: Only admins can switch roles in test mode
-      if (user && user.role !== 'admin') {
+      // Security: Only real administrators can switch roles in test mode (including switching back from staff)
+      if (!user || !authService.canSwitchRole(user.id)) {
         throw new Error('Unauthorized. Only administrators can switch test roles.');
       }
 

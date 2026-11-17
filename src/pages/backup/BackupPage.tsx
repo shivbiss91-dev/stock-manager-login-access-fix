@@ -21,6 +21,7 @@ export const BackupPage: React.FC = () => {
   const { addNotification } = useNotificationStore();
   const [isExporting, setIsExporting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [pendingRestoreContent, setPendingRestoreContent] = useState<string | null>(null);
   const [restoreModalData, setRestoreModalData] = useState<DatabaseSnapshot['metadata'] | null>(null);
   const [dbStats, setDbStats] = useState({
     items: 0,
@@ -28,7 +29,7 @@ export const BackupPage: React.FC = () => {
     warehouses: 0,
   });
 
-  React.useEffect(() => {
+  const refreshStats = () => {
     backupService.generateSnapshot().then((snapshot) => {
       setDbStats({
         items: snapshot.metadata.itemsCount,
@@ -36,6 +37,10 @@ export const BackupPage: React.FC = () => {
         warehouses: snapshot.metadata.warehousesCount,
       });
     });
+  };
+
+  React.useEffect(() => {
+    refreshStats();
   }, []);
 
   const handleDownloadSnapshot = async () => {
@@ -70,14 +75,16 @@ export const BackupPage: React.FC = () => {
 
     setIsRestoring(true);
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const content = event.target?.result as string;
-      const res = await backupService.restoreSnapshot(content);
+      const res = backupService.validateSnapshot(content);
       setIsRestoring(false);
 
       if (res.success && res.metadata) {
+        setPendingRestoreContent(content);
         setRestoreModalData(res.metadata);
       } else {
+        setPendingRestoreContent(null);
         addNotification({
           title: 'Invalid Snapshot',
           message: res.error || 'The uploaded file could not be parsed as a StockVista backup.',
@@ -90,13 +97,30 @@ export const BackupPage: React.FC = () => {
     e.target.value = '';
   };
 
-  const confirmRestore = () => {
-    setRestoreModalData(null);
-    addNotification({
-      title: 'Database Restored',
-      message: 'All records and master schemas have been synced with the snapshot.',
-      type: 'success',
-    });
+  const confirmRestore = async () => {
+    if (!pendingRestoreContent) return;
+    setIsRestoring(true);
+    try {
+      const res = await backupService.restoreSnapshot(pendingRestoreContent);
+      if (res.success) {
+        setRestoreModalData(null);
+        setPendingRestoreContent(null);
+        refreshStats();
+        addNotification({
+          title: 'Database Restored',
+          message: 'All records and master schemas have been synced with the snapshot.',
+          type: 'success',
+        });
+      } else {
+        addNotification({
+          title: 'Restore Failed',
+          message: res.error || 'Failed to apply backup snapshot.',
+          type: 'error',
+        });
+      }
+    } finally {
+      setIsRestoring(false);
+    }
   };
 
   return (
@@ -323,17 +347,21 @@ export const BackupPage: React.FC = () => {
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
               <button
                 type="button"
-                onClick={() => setRestoreModalData(null)}
+                onClick={() => {
+                  setRestoreModalData(null);
+                  setPendingRestoreContent(null);
+                }}
                 className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05] rounded-xl transition"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={isRestoring}
                 onClick={confirmRestore}
                 className="px-4 py-2 text-xs font-semibold rounded-xl bg-accent-orange text-white hover:bg-accent-orange/90 transition shadow-sm"
               >
-                Apply Restoration
+                {isRestoring ? 'Restoring...' : 'Apply Restoration'}
               </button>
             </div>
           </div>

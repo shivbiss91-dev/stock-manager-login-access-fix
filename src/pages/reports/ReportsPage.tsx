@@ -16,7 +16,8 @@ import {
 import { inventoryService } from '../../services/inventoryService';
 import { invoiceService } from '../../services/invoiceService';
 import { purchaseService } from '../../services/purchaseService';
-import { ComputedInventoryItem, MaterialCategory } from '../../types/inventory';
+import { ComputedInventoryItem } from '../../types/inventory';
+import { getAllCategories, formatCategoryName } from '../../data/materialCategories';
 import { Invoice } from '../../types/sales';
 import { GoodsReceivedNote } from '../../types/warehouse';
 import { formatINR } from '../../utils/formatINR';
@@ -54,22 +55,43 @@ export const ReportsPage: React.FC = () => {
     };
   }, []);
 
-  // Category breakdown calculation
+  // Category breakdown calculation using active catalogue categories + any categories on saved items
   const categoryValuation = React.useMemo(() => {
-    const cats: MaterialCategory[] = ['wood', 'metal', 'plastic', 'glass', 'fabric', 'rubber', 'paper', 'ceramic'];
-    return cats.map((cat) => {
-      const catItems = items.filter((i) => i.materialCategory === cat);
-      const totalStock = catItems.reduce((acc, i) => acc + i.currentStock, 0);
-      const totalVal = catItems.reduce((acc, i) => acc + i.currentStock * i.costPrice, 0);
-      const lowStockCount = catItems.filter((i) => i.stockStatus === 'low_stock' || i.stockStatus === 'out_of_stock').length;
-      return {
-        category: cat,
-        itemsCount: catItems.length,
-        totalStock,
-        totalVal,
-        lowStockCount,
-      };
-    });
+    const categoryOrder: string[] = [];
+    const seen = new Set<string>();
+
+    for (const item of items) {
+      if (item.materialCategory && !seen.has(item.materialCategory)) {
+        seen.add(item.materialCategory);
+        categoryOrder.push(item.materialCategory);
+      }
+    }
+
+    for (const cat of getAllCategories()) {
+      if (!seen.has(cat.id)) {
+        seen.add(cat.id);
+        categoryOrder.push(cat.id);
+      }
+    }
+
+    return categoryOrder
+      .map((cat) => {
+        const catItems = items.filter((i) => i.materialCategory === cat);
+        const totalStock = catItems.reduce((acc, i) => acc + i.currentStock, 0);
+        const totalVal = catItems.reduce((acc, i) => acc + i.currentStock * i.costPrice, 0);
+        const lowStockCount = catItems.filter(
+          (i) => i.stockStatus === 'low_stock' || i.stockStatus === 'out_of_stock'
+        ).length;
+        return {
+          category: cat,
+          label: formatCategoryName(cat),
+          itemsCount: catItems.length,
+          totalStock,
+          totalVal,
+          lowStockCount,
+        };
+      })
+      .filter((row) => row.itemsCount > 0 || items.length === 0);
   }, [items]);
 
   const totalStockValue = categoryValuation.reduce((acc, c) => acc + c.totalVal, 0);
@@ -85,6 +107,66 @@ export const ReportsPage: React.FC = () => {
   const deadStockItems = items.filter((i) => i.stockStatus === 'dead_stock');
 
   const handleExportCSV = (reportName: string) => {
+    let headers: string[] = [];
+    let rows: (string | number)[][] = [];
+
+    if (reportName === 'REORDER_PLAN' || activeTab === 'reorder') {
+      headers = ['Product', 'SKU', 'Warehouse', 'Available Stock', 'Unit', 'Reorder Level', 'Suggested PO Qty', 'Estimated Cost'];
+      rows = lowStockItems.map((item) => {
+        const suggestedPO = Math.max(50, item.reorderLevel * 2 - item.currentStock);
+        return [
+          `"${item.name.replace(/"/g, '""')}"`,
+          item.sku,
+          `"${(item.warehouseName || '').replace(/"/g, '""')}"`,
+          item.currentStock,
+          item.unit,
+          item.reorderLevel,
+          suggestedPO,
+          (suggestedPO * item.costPrice).toFixed(2),
+        ];
+      });
+    } else if (activeTab === 'gst') {
+      headers = ['Invoice Number', 'Customer', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Grand Total'];
+      rows = invoices.map((inv) => [
+        inv.invoiceNumber,
+        `"${(inv.customerName || '').replace(/"/g, '""')}"`,
+        (inv.subtotalTaxable || 0).toFixed(2),
+        (inv.cgstTotal || 0).toFixed(2),
+        (inv.sgstTotal || 0).toFixed(2),
+        (inv.igstTotal || 0).toFixed(2),
+        (inv.grandTotal || 0).toFixed(2),
+      ]);
+    } else if (activeTab === 'velocity') {
+      headers = ['Product', 'SKU', 'Velocity', 'Stock Status', 'Current Stock', '30-Day Sales', 'Selling Price'];
+      rows = items.map((item) => [
+        `"${item.name.replace(/"/g, '""')}"`,
+        item.sku,
+        item.salesVelocity,
+        item.stockStatus,
+        item.currentStock,
+        item.sales30Days,
+        item.sellingPrice.toFixed(2),
+      ]);
+    } else {
+      headers = ['Category', 'Active SKUs', 'Physical Quantity', 'Valuation (INR)', 'Below Reorder'];
+      rows = categoryValuation.map((row) => [
+        `"${row.label.replace(/"/g, '""')}"`,
+        row.itemsCount,
+        row.totalStock,
+        row.totalVal.toFixed(2),
+        row.lowStockCount,
+      ]);
+    }
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `StockVista_${reportName}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
     addNotification({
       title: 'Report Downloaded',
       message: `${reportName} exported to CSV format.`,
@@ -208,8 +290,8 @@ export const ReportsPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-white/[0.04] text-slate-700 dark:text-slate-300">
                   {categoryValuation.map((row) => (
                     <tr key={row.category} className="hover:bg-slate-50/60 dark:hover:bg-white/[0.02] transition">
-                      <td className="py-3 px-4 capitalize font-semibold text-slate-900 dark:text-white">
-                        {row.category}
+                      <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
+                        {row.label}
                       </td>
                       <td className="py-3 px-3 text-center">{row.itemsCount} SKUs</td>
                       <td className="py-3 px-3 text-right font-medium">

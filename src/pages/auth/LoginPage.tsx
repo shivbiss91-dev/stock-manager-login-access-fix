@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 const loginSchema = z.object({
-  email: z.string().email('Please enter a valid corporate email address'),
+  email: z.string().trim().email('Please enter a valid corporate email address'),
   password: z.string().min(4, 'Password must be at least 4 characters'),
   rememberMe: z.boolean().optional(),
 });
@@ -37,9 +37,9 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 const setupSchema = z
   .object({
-    name: z.string().min(2, 'Full name is required (minimum 2 characters)'),
-    email: z.string().email('Please enter a valid corporate email address'),
-    phone: z.string().min(10, 'Valid 10-digit mobile number required'),
+    name: z.string().trim().min(2, 'Full name is required (minimum 2 characters)'),
+    email: z.string().trim().email('Please enter a valid corporate email address'),
+    phone: z.string().trim().min(10, 'Valid 10-digit mobile number required'),
     password: z.string().min(4, 'Password must be at least 4 characters'),
     confirmPassword: z.string().min(4, 'Confirm password is required'),
   })
@@ -59,6 +59,8 @@ export const LoginPage: React.FC = () => {
     sendPhoneOtp,
     verifyPhoneOtp,
     createInitialAdmin,
+    isAuthenticated,
+    user,
     isLoading,
     error,
     clearError,
@@ -84,6 +86,19 @@ export const LoginPage: React.FC = () => {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [hasAdminAccount, setHasAdminAccount] = useState<boolean>(() => authService.hasAdminSync());
 
+  const locationState = location.state as { from?: { pathname: string }; error?: string } | null;
+  const rawFrom = locationState?.from?.pathname;
+  const from = rawFrom && rawFrom !== '/login' ? rawFrom : '/dashboard';
+  const redirectedError = locationState?.error || null;
+  const displayedError = error || redirectedError;
+
+  // Redirect already-authenticated users straight to the app
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, user, from, navigate]);
+
   // Sync whether an initial administrator account exists
   useEffect(() => {
     let isMounted = true;
@@ -96,8 +111,6 @@ export const LoginPage: React.FC = () => {
       isMounted = false;
     };
   }, []);
-
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -122,7 +135,7 @@ export const LoginPage: React.FC = () => {
   const onLoginSubmit = async (data: LoginFormData) => {
     clearError();
     try {
-      const result = await login(data.email, data.password);
+      const result = await login(data.email, data.password, data.rememberMe);
       if (result.requiresOtp) {
         setShowOtpModal(true);
       } else {
@@ -376,10 +389,10 @@ export const LoginPage: React.FC = () => {
                       {...setupForm.register('confirmPassword')}
                     />
 
-                    {error && (
+                    {displayedError && (
                       <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-600 dark:text-rose-400">
                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                        <span>{error}</span>
+                        <span>{displayedError}</span>
                       </div>
                     )}
 
@@ -445,10 +458,10 @@ export const LoginPage: React.FC = () => {
                       </button>
                     </div>
 
-                    {error && (
+                    {displayedError && (
                       <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-600 dark:text-rose-400">
                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                        <span>{error}</span>
+                        <span>{displayedError}</span>
                       </div>
                     )}
 

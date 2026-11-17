@@ -22,6 +22,7 @@ import { SuppliersPage } from './pages/parties/SuppliersPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
+import { AuditLogPage } from './pages/audit/AuditLogPage';
 import { UsersPage } from './pages/users/UsersPage';
 import { BackupPage } from './pages/backup/BackupPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
@@ -195,6 +196,16 @@ export const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={['admin', 'manager']}>
                 <ApprovalsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Audit Log (Admin only) */}
+          <Route
+            path="/audit-log"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AuditLogPage />
               </ProtectedRoute>
             }
           />
