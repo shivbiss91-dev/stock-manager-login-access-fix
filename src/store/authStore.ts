@@ -20,6 +20,7 @@ interface AuthStore {
   otpMaskedPhone: string | null;
 
   login: (email: string, passwordHash: string, rememberMe?: boolean) => Promise<{ requiresOtp: boolean }>;
+  loginAdmin: (email: string, password: string, rememberMe?: boolean) => Promise<{ requiresOtp: boolean }>;
   loginWithGoogle: (email: string, name?: string, role?: Role) => Promise<void>;
   sendPhoneOtp: (phone: string) => Promise<{ otpCode: string; isNewUser: boolean; message: string }>;
   verifyPhoneOtp: (phone: string, otpCode: string, name?: string, role?: Role) => Promise<void>;
@@ -75,6 +76,29 @@ export const useAuthStore = create<AuthStore>((set, get) => {
         return { requiresOtp: false };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
+        set({ isLoading: false, error: message });
+        throw err;
+      }
+    },
+
+    loginAdmin: async (email: string, password: string, rememberMe = true) => {
+      set({ isLoading: true, error: null });
+      try {
+        const result = await authService.loginAdmin(email, password, rememberMe);
+        if (result.session && result.user) {
+          set({
+            user: result.user,
+            session: result.session,
+            isAuthenticated: true,
+            isLoading: false,
+            otpPendingEmail: null,
+            otpMaskedPhone: null,
+          });
+        }
+        return { requiresOtp: false };
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Invalid administrator login ID or password.';
         set({ isLoading: false, error: message });
         throw err;
       }

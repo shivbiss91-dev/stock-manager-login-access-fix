@@ -22,99 +22,125 @@ function sanitizeUser(account: UserAccount): User {
   return clean;
 }
 
+// Single fixed administrator credentials — Admin login only opens with this exact ID & password
+const FIXED_ADMIN_CONFIG = {
+  id: 'usr-admin-01',
+  name: 'System Administrator',
+  email: 'admin@stockvista.in',
+  passwordHash: 'StockVista@2026',
+  phone: '+91 98200 12345',
+} as const;
+
+function buildFixedAdminAccount(now: string, existing?: UserAccount): UserAccount {
+  return {
+    id: FIXED_ADMIN_CONFIG.id,
+    name: existing?.name || FIXED_ADMIN_CONFIG.name,
+    email: FIXED_ADMIN_CONFIG.email,
+    role: 'admin',
+    roleTitle: 'System Administrator',
+    phone: existing?.phone || FIXED_ADMIN_CONFIG.phone,
+    passwordHash: FIXED_ADMIN_CONFIG.passwordHash,
+    requiresOtp: false,
+    status: 'active',
+    lastLogin: now,
+    warehouseId: 'all',
+    warehouseName: 'All Facilities',
+    permissions: [...DEFAULT_ROLE_MODULES.admin],
+    loginMethod: 'email_password',
+    preferredLoginMethod: 'email_password',
+    createdAt: existing?.createdAt || now,
+  };
+}
+
 // Temporary in-memory phone OTP store for active sessions
 const phoneOtpStore = new Map<string, { code: string; expiresAt: number; phone: string }>();
 
 export const authService = {
   hasAdminSync(): boolean {
-    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
-    return Array.isArray(users) && users.some((u) => u.role === 'admin' && !u.isDemo);
+    return true;
   },
 
   async hasAdmin(): Promise<boolean> {
-    return this.hasAdminSync();
+    return true;
   },
 
   async hasUsers(): Promise<boolean> {
-    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
-    return Array.isArray(users) && users.length > 0;
+    return true;
   },
 
-  async createInitialAdmin(input: InitialAdminInput): Promise<AuthSession> {
-    await new Promise((res) => setTimeout(res, 200));
+  async createInitialAdmin(_input: InitialAdminInput): Promise<AuthSession> {
+    await new Promise((res) => setTimeout(res, 150));
+    throw new Error('Administrator account is already configured. Please sign in with your administrator login ID and password.');
+  },
 
-    const existingUsers = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
-    const hasExistingAdmin =
-      Array.isArray(existingUsers) && existingUsers.some((u) => u.role === 'admin' && !u.isDemo);
-    if (hasExistingAdmin) {
-      throw new Error('Initial administrator account already exists. Please log in with existing credentials.');
-    }
+  /**
+   * Strict Administrator Login:
+   * Only the single configured Admin Login ID and Password can sign in as Administrator.
+   */
+  async loginAdmin(email: string, password: string, rememberMe = true): Promise<LoginResult> {
+    await new Promise((res) => setTimeout(res, 180));
 
-    if (!input.name || !input.name.trim()) {
-      throw new Error('Administrator full name is required.');
-    }
-    if (!input.email || !input.email.includes('@')) {
-      throw new Error('A valid corporate work email is required.');
-    }
-    if (!input.password || input.password.length < 4) {
-      throw new Error('Password must be at least 4 characters long.');
-    }
-
-    const normalizedEmail = input.email.trim().toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
     if (
-      Array.isArray(existingUsers) &&
-      existingUsers.some((u) => u.email.toLowerCase() === normalizedEmail)
+      normalizedEmail !== FIXED_ADMIN_CONFIG.email ||
+      password !== FIXED_ADMIN_CONFIG.passwordHash
     ) {
-      throw new Error('An account with this email address already exists. Please use a different email or log in.');
+      throw new Error('Invalid administrator login ID or password.');
     }
 
     const now = new Date().toISOString();
-    const adminUser: UserAccount = {
-      id: 'usr-admin-01',
-      name: input.name.trim(),
-      email: normalizedEmail,
-      role: 'admin',
-      roleTitle: 'System Administrator',
-      phone: input.phone?.trim() || '+91 98000 00000',
-      passwordHash: input.password,
-      requiresOtp: false,
-      status: 'active',
-      lastLogin: now,
-      warehouseId: 'all',
-      warehouseName: 'All Facilities',
-      permissions: [...DEFAULT_ROLE_MODULES.admin],
-      loginMethod: 'email_password',
-      preferredLoginMethod: 'email_password',
-      createdAt: now,
-    };
+    const existingUsers = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const safeUsers = Array.isArray(existingUsers) ? existingUsers : [];
+    const existingAdmin = safeUsers.find(
+      (u) => u.id === FIXED_ADMIN_CONFIG.id || (u.email || '').trim().toLowerCase() === FIXED_ADMIN_CONFIG.email
+    );
+    const adminAccount = buildFixedAdminAccount(now, existingAdmin);
 
-    const nextUsers = Array.isArray(existingUsers) ? [adminUser, ...existingUsers] : [adminUser];
-    StorageService.setProduction(STORAGE_KEYS.USERS, nextUsers);
+    const nonAdminUsers = safeUsers.filter(
+      (u) => u.id !== FIXED_ADMIN_CONFIG.id && (u.email || '').trim().toLowerCase() !== FIXED_ADMIN_CONFIG.email
+    );
+    StorageService.setProduction(STORAGE_KEYS.USERS, [adminAccount, ...nonAdminUsers]);
+
+    const sessionDurationMs = rememberMe
+      ? 7 * 24 * 60 * 60 * 1000 // 7 days
+      : 8 * 60 * 60 * 1000; // 8 hours
 
     const session: AuthSession = {
-      user: sanitizeUser(adminUser),
-      token: `token_${adminUser.id}_${Date.now()}`,
-      expiresAt: Date.now() + 8 * 60 * 60 * 1000, // 8 hours
+      user: sanitizeUser(adminAccount),
+      token: `token_${adminAccount.id}_${Date.now()}`,
+      expiresAt: Date.now() + sessionDurationMs,
     };
 
     StorageService.set(STORAGE_KEYS.SESSION, session);
-    return session;
+    return {
+      requiresOtp: false,
+      user: session.user,
+      session,
+    };
   },
 
   async login(email: string, passwordHash: string, rememberMe = true): Promise<LoginResult> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail === FIXED_ADMIN_CONFIG.email) {
+      return this.loginAdmin(email, passwordHash, rememberMe);
+    }
+
     await new Promise((res) => setTimeout(res, 180));
 
     const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     if (!Array.isArray(users) || users.length === 0) {
-      throw new Error('No administrator account has been created yet. Create the initial administrator account first.');
+      throw new Error('Invalid email address or user account does not exist.');
     }
-    const normalizedEmail = email.trim().toLowerCase();
     const userAccount = users.find(
       (u) => (u.email || '').trim().toLowerCase() === normalizedEmail
     );
 
     if (!userAccount) {
       throw new Error('Invalid email address or user account does not exist.');
+    }
+
+    if (userAccount.role === 'admin') {
+      throw new Error('Invalid administrator login ID or password.');
     }
 
     if (
@@ -184,10 +210,17 @@ export const authService = {
       throw new Error('Valid Google/Gmail account email is required.');
     }
 
-    const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
-    let userAccount = users.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (role === 'admin' || cleanEmail === FIXED_ADMIN_CONFIG.email) {
+      throw new Error('Administrator accounts must sign in using the Admin Login ID and Password on the Admin tab.');
+    }
+
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    let userAccount = users.find((u) => (u.email || '').trim().toLowerCase() === cleanEmail);
 
     if (userAccount) {
+      if (userAccount.role === 'admin') {
+        throw new Error('Administrator accounts must sign in using the Admin Login ID and Password on the Admin tab.');
+      }
       // Existing staff
       if (userAccount.status === 'deactivated' || userAccount.status === 'suspended') {
         throw new Error('Your account has been deactivated by the administrator. Access is blocked.');
@@ -199,7 +232,7 @@ export const authService = {
       userAccount.lastLogin = new Date().toISOString();
       userAccount.preferredLoginMethod = 'google';
       if (!userAccount.loginMethod) userAccount.loginMethod = 'google';
-      StorageService.set(STORAGE_KEYS.USERS, users);
+      StorageService.setProduction(STORAGE_KEYS.USERS, users);
     } else {
       // New staff registration via Google
       const id = `usr-g-${Date.now().toString().slice(-5)}`;
@@ -270,9 +303,13 @@ export const authService = {
       throw new Error('Please enter a valid 10-digit mobile number.');
     }
 
-    const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const digits = cleanPhone.replace(/\D/g, '').slice(-10);
-    const existing = users.find((u) => u.phone.replace(/\D/g, '').endsWith(digits));
+    const existing = users.find((u) => (u.phone || '').replace(/\D/g, '').endsWith(digits));
+
+    if (existing && existing.role === 'admin') {
+      throw new Error('Administrator accounts must sign in using the Admin Login ID and Password on the Admin tab.');
+    }
 
     if (existing && (existing.status === 'deactivated' || existing.status === 'suspended')) {
       throw new Error('This account has been deactivated by the administrator. Login is blocked.');
@@ -315,10 +352,17 @@ export const authService = {
       }
     }
 
-    const users = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
-    let userAccount = users.find((u) => u.phone.replace(/\D/g, '').endsWith(digits));
+    if (role === 'admin') {
+      throw new Error('Administrator accounts must sign in using the Admin Login ID and Password on the Admin tab.');
+    }
+
+    const users = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    let userAccount = users.find((u) => (u.phone || '').replace(/\D/g, '').endsWith(digits));
 
     if (userAccount) {
+      if (userAccount.role === 'admin') {
+        throw new Error('Administrator accounts must sign in using the Admin Login ID and Password on the Admin tab.');
+      }
       // Existing user
       if (userAccount.status === 'deactivated' || userAccount.status === 'suspended') {
         throw new Error('Your account has been deactivated by the administrator. Access is blocked.');
@@ -330,7 +374,7 @@ export const authService = {
       userAccount.lastLogin = new Date().toISOString();
       userAccount.preferredLoginMethod = 'phone_otp';
       if (!userAccount.loginMethod) userAccount.loginMethod = 'phone_otp';
-      StorageService.set(STORAGE_KEYS.USERS, users);
+      StorageService.setProduction(STORAGE_KEYS.USERS, users);
     } else {
       // New staff registration via Phone/OTP
       const id = `usr-p-${Date.now().toString().slice(-5)}`;
