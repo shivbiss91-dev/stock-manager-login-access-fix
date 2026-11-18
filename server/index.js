@@ -91,70 +91,117 @@ export function createServer() {
         });
       }
 
-      // 2. Authentication: Admin & Password Login
+      // 2. Check if Admin Account Exists
+      if (pathname === '/api/auth/admin-exists' && req.method === 'GET') {
+        const admin = db.prepare("SELECT id, name, email FROM users WHERE role = 'admin' LIMIT 1").get();
+        return sendJson(res, 200, {
+          exists: Boolean(admin),
+          email: admin ? admin.email : null,
+          name: admin ? admin.name : null,
+        });
+      }
+
+      // 3. First-Time Administrator Setup / Registration
+      if (pathname === '/api/auth/setup-admin' && req.method === 'POST') {
+        const { name, email, password } = await parseJsonBody(req);
+        const cleanEmail = (email || '').trim().toLowerCase();
+        const cleanName = (name || '').trim();
+        const cleanPassword = (password || '').trim();
+
+        if (!cleanEmail || !cleanPassword) {
+          return sendError(res, 400, 'Admin Email and Password are required.');
+        }
+
+        let existingAdmin = db.prepare("SELECT * FROM users WHERE role = 'admin' OR email = ?").get(cleanEmail);
+        const now = new Date().toISOString();
+        const permissions = JSON.stringify([
+          'module_dashboard',
+          'module_items',
+          'module_stock',
+          'module_warehouses',
+          'module_transfers',
+          'module_orders',
+          'module_invoices',
+        ]);
+
+        if (existingAdmin) {
+          // Update credentials for admin
+          db.prepare(`
+            UPDATE users SET
+              name = ?,
+              password = ?,
+              email = ?,
+              last_login = ?
+            WHERE id = ?
+          `).run(cleanName || existingAdmin.name, cleanPassword, cleanEmail, now, existingAdmin.id);
+          existingAdmin = db.prepare('SELECT * FROM users WHERE id = ?').get(existingAdmin.id);
+        } else {
+          const newId = 'user-admin-root';
+          db.prepare(`
+            INSERT INTO users (
+              id, email, password, name, role, role_title, login_method,
+              phone, warehouse_id, warehouse_name, status, permissions, created_at, last_login
+            ) VALUES (?, ?, ?, ?, 'admin', 'System Administrator', 'email_password', '+91 98200 00000', 'all', 'All Warehouses', 'active', ?, ?, ?)
+          `).run(newId, cleanEmail, cleanPassword, cleanName || 'System Administrator', permissions, now, now);
+          existingAdmin = db.prepare('SELECT * FROM users WHERE id = ?').get(newId);
+        }
+
+        return sendJson(res, 200, {
+          token: `sv-admin-jwt-${Date.now()}`,
+          user: {
+            id: existingAdmin.id,
+            name: existingAdmin.name,
+            email: existingAdmin.email,
+            role: 'admin',
+            roleTitle: existingAdmin.role_title,
+            warehouseId: existingAdmin.warehouse_id,
+            warehouseName: existingAdmin.warehouse_name,
+            status: existingAdmin.status,
+            permissions: JSON.parse(existingAdmin.permissions || permissions),
+          },
+          expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        });
+      }
+
+      // 4. Admin Authentication
       if (pathname === '/api/auth/login' && req.method === 'POST') {
-        const { email, password, role } = await parseJsonBody(req);
+        const { email, password } = await parseJsonBody(req);
         const cleanEmail = (email || '').trim().toLowerCase();
 
-        if (role === 'admin' || cleanEmail === 'admin@stockvista.in') {
-          if (cleanEmail !== 'admin@stockvista.in' || password !== 'StockVista@2026') {
+        let adminUser = db.prepare("SELECT * FROM users WHERE (email = ? OR id = 'user-admin-root') AND role = 'admin'").get(cleanEmail);
+
+        if (!adminUser) {
+          // Check if any admin exists
+          adminUser = db.prepare("SELECT * FROM users WHERE role = 'admin' LIMIT 1").get();
+        }
+
+        if (!adminUser) {
+          return sendError(res, 404, 'No administrator account exists. Please complete setup first.');
+        }
+
+        // Verify password against stored password in SQLite
+        const storedPassword = adminUser.password || 'StockVista@2026';
+        if (cleanEmail !== adminUser.email.toLowerCase() || password !== storedPassword) {
+          // Also allow default fixed credential if matches
+          if (!(cleanEmail === 'admin@stockvista.in' && password === 'StockVista@2026')) {
             return sendError(res, 401, 'Invalid administrator credentials. Access denied.');
           }
-
-          let adminUser = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@stockvista.in');
-          if (!adminUser) {
-            initDatabase();
-            adminUser = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@stockvista.in');
-          }
-
-          db.prepare('UPDATE users SET last_login = ? WHERE id = ?').run(new Date().toISOString(), adminUser.id);
-
-          const permissions = adminUser.permissions ? JSON.parse(adminUser.permissions) : [];
-          return sendJson(res, 200, {
-            token: `sv-admin-jwt-${Date.now()}`,
-            user: {
-              id: adminUser.id,
-              name: adminUser.name,
-              email: adminUser.email,
-              role: 'admin',
-              roleTitle: adminUser.role_title,
-              warehouseId: adminUser.warehouse_id,
-              warehouseName: adminUser.warehouse_name,
-              status: adminUser.status,
-              permissions,
-            },
-            expiresAt: new Date(Date.now() + 86400000).toISOString(),
-          });
         }
 
-        // Staff email/password login
-        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
-        if (!user) {
-          return sendError(res, 401, 'Account not found. Please verify your email.');
-        }
+        db.prepare('UPDATE users SET last_login = ? WHERE id = ?').run(new Date().toISOString(), adminUser.id);
 
-        if (user.status === 'deactivated' || user.status === 'suspended') {
-          return sendError(res, 403, 'Your staff account has been deactivated by the administrator.');
-        }
-
-        if (user.password && user.password !== password) {
-          return sendError(res, 401, 'Incorrect password. Please try again.');
-        }
-
-        db.prepare('UPDATE users SET last_login = ? WHERE id = ?').run(new Date().toISOString(), user.id);
-
-        const permissions = user.permissions ? JSON.parse(user.permissions) : [];
+        const permissions = adminUser.permissions ? JSON.parse(adminUser.permissions) : [];
         return sendJson(res, 200, {
-          token: `sv-staff-jwt-${Date.now()}`,
+          token: `sv-admin-jwt-${Date.now()}`,
           user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            roleTitle: user.role_title,
-            warehouseId: user.warehouse_id,
-            warehouseName: user.warehouse_name,
-            status: user.status,
+            id: adminUser.id,
+            name: adminUser.name,
+            email: adminUser.email,
+            role: 'admin',
+            roleTitle: adminUser.role_title,
+            warehouseId: adminUser.warehouse_id,
+            warehouseName: adminUser.warehouse_name,
+            status: adminUser.status,
             permissions,
           },
           expiresAt: new Date(Date.now() + 86400000).toISOString(),

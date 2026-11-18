@@ -8,7 +8,6 @@ import {
   LogOut,
   ShieldCheck,
   ChevronDown,
-  UserCheck,
   Users,
   ExternalLink,
 } from 'lucide-react';
@@ -29,10 +28,9 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { user, logout, switchRole, canSwitchRole } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const [isOpen, setIsOpen] = useState(false);
-  const [showRoleSubmenu, setShowRoleSubmenu] = useState(false);
   const [showLangSubmenu, setShowLangSubmenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +41,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsOpen(false);
-        setShowRoleSubmenu(false);
         setShowLangSubmenu(false);
       }
     };
@@ -51,7 +48,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsOpen(false);
-        setShowRoleSubmenu(false);
         setShowLangSubmenu(false);
       }
     };
@@ -76,12 +72,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     viewer: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
   };
 
-  const handleRoleSelect = (role: Role) => {
-    switchRole(role);
-    setIsOpen(false);
-    setShowRoleSubmenu(false);
-  };
-
   const handleLangSelect = (code: string) => {
     changeAppLanguage(code);
     setIsOpen(false);
@@ -90,14 +80,12 @@ export const UserMenu: React.FC<UserMenuProps> = ({
 
   const handleNavigate = (path: string) => {
     setIsOpen(false);
-    setShowRoleSubmenu(false);
     setShowLangSubmenu(false);
     navigate(path);
   };
 
   const handleLogout = () => {
     setIsOpen(false);
-    setShowRoleSubmenu(false);
     setShowLangSubmenu(false);
     logout();
     navigate('/login');
@@ -320,54 +308,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* Role switcher (ERP Testing - Admin and Staff only, no Manager) */}
-              {canSwitchRole() && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowRoleSubmenu(!showRoleSubmenu)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-xl text-slate-700 dark:text-[#F2F4F8] hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <ShieldCheck className="w-4 h-4 text-brand-orange" />
-                      <span>
-                        Switch Role (Test): <strong className="capitalize">{user.role}</strong>
-                      </span>
-                    </div>
-                    <ChevronDown
-                      className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
-                        showRoleSubmenu ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-
-                  {showRoleSubmenu && (
-                    <div className="my-1 ml-4 pl-2 border-l border-slate-200 dark:border-white/[0.08] space-y-1">
-                      {(['admin', 'staff'] as Role[]).map((r) => (
-                        <button
-                          type="button"
-                          key={r}
-                          onClick={() => handleRoleSelect(r)}
-                          className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg capitalize transition-colors cursor-pointer ${
-                            user.role === r
-                              ? 'font-bold text-brand-orange bg-slate-100 dark:bg-white/10 shadow-sm'
-                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                          }`}
-                        >
-                          <span className="flex items-center gap-1.5">
-                            {user.role === r && <UserCheck className="w-3.5 h-3.5 text-emerald-500" />}
-                            {r === 'admin' ? 'Admin' : 'Staff'}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {r === 'admin' ? 'Full Access' : 'Role-based Access'}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               <div className="border-t border-slate-100 dark:border-white/[0.06] my-1 pt-1" />
 

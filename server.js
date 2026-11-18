@@ -4,7 +4,8 @@ import { DB_PATH } from './server/db.js';
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const server = createServer();
 
-server.listen(PORT, '0.0.0.0', () => {
+const HOST = process.env.HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => {
   console.log(`====================================================`);
   console.log(`  StockVista SQLite Backend Server`);
   console.log(`  Running on: http://localhost:${PORT}`);

@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/shell/AppLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/auth/LoginPage';
+import { SignupPage } from './pages/auth/SignupPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { AllItemsPage } from './pages/items/AllItemsPage';
 import { ItemDetailPage } from './pages/items/ItemDetailPage';
@@ -29,6 +30,8 @@ export const App: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/setup" element={<SignupPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
         {/* Protected App Routes inside AppShell */}
         <Route

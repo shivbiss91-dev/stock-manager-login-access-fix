@@ -12,8 +12,9 @@ export const DB_PATH = path.join(DATA_DIR, 'stockvista.db');
 export function initDatabase(dbPath = DB_PATH) {
   const db = new DatabaseSync(dbPath);
 
-  // Enable WAL mode and foreign keys for high performance and integrity
+  // Enable WAL mode, full synchronous write durability, and foreign keys for high performance and integrity
   db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA synchronous = FULL;');
   db.exec('PRAGMA foreign_keys = ON;');
 
   // 1. Separate table for users & admin credentials to prevent any mix-up with products
