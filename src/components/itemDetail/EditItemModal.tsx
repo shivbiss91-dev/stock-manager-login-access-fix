@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldAlert,
-  FileText,
   Image as ImageIcon,
   Upload,
   Trash2,
@@ -18,7 +17,6 @@ import { ComputedInventoryItem, MaterialCategory } from '../../types/inventory';
 import { PRODUCT_CATEGORIES } from '../../data/materialCategories';
 import { useAuthStore } from '../../store/authStore';
 import { inventoryService } from '../../services/inventoryService';
-import { approvalsService } from '../../services/approvalsService';
 import { useNotificationStore } from '../../store/notificationStore';
 import { formatINR } from '../../utils/formatINR';
 import { PackagingConversions } from '../../utils/unitConversions';
@@ -70,8 +68,6 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
   );
   const [description, setDescription] = useState(item.description);
 
-  // Approval request specific fields
-  const [approvalReason, setApprovalReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -246,85 +242,35 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      if (isAdmin) {
-        // Direct admin update (preserves SKU, HSN, GST, warehouse, and rack location data)
-        const updated = await inventoryService.updateItem(item.id, {
-          name: name.trim(),
-          sku: item.sku,
-          materialCategory,
-          images: finalImages,
-          hsnCode: item.hsnCode,
-          gstRate: item.gstRate,
-          warehouseId: item.warehouseId || '',
-          warehouseName: item.warehouseName || 'Unassigned',
-          unit: item.unit,
-          materialSubtype: materialSubtype.trim(),
-          rackLocation: item.rackLocation || '',
-          sellingPrice: parsedSelling,
-          costPrice: parsedCost,
-          reorderLevel: parsedReorder,
-          reorderQuantity: parsedReorderQty,
-          packagingConversions: updatedPackaging,
-          description: description.trim(),
-        });
+      // Direct update (preserves SKU, HSN, GST, warehouse, and rack location data)
+      const updated = await inventoryService.updateItem(item.id, {
+        name: name.trim(),
+        sku: item.sku,
+        materialCategory,
+        images: finalImages,
+        hsnCode: item.hsnCode,
+        gstRate: item.gstRate,
+        warehouseId: item.warehouseId || '',
+        warehouseName: item.warehouseName || 'Unassigned',
+        unit: item.unit,
+        materialSubtype: materialSubtype.trim(),
+        rackLocation: item.rackLocation || '',
+        sellingPrice: parsedSelling,
+        costPrice: parsedCost,
+        reorderLevel: parsedReorder,
+        reorderQuantity: parsedReorderQty,
+        packagingConversions: updatedPackaging,
+        description: description.trim(),
+      });
 
-        addNotification({
-          title: 'Product Information Updated',
-          message: `${item.name} (${item.sku}) master record and product image saved.`,
-          type: 'success',
-        });
+      addNotification({
+        title: 'Product Information Updated',
+        message: `${item.name} (${item.sku}) master record and product image saved.`,
+        type: 'success',
+      });
 
-        onItemUpdated(updated);
-        onClose();
-      } else {
-        // Non-admin approval request
-        if (!approvalReason.trim()) {
-          setErrorMsg('Please provide a justification reason for your edit request.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const changes: string[] = [];
-        if (imageUrl !== (item.images[0] || '')) {
-          changes.push(imageUrl ? 'Updated product image' : 'Removed product image');
-        }
-        if (parsedSelling !== item.sellingPrice) {
-          changes.push(`Price: ${formatINR(item.sellingPrice)} ➔ ${formatINR(parsedSelling)}`);
-        }
-        if (parsedCost !== item.costPrice) {
-          changes.push(`Cost: ${formatINR(item.costPrice)} ➔ ${formatINR(parsedCost)}`);
-        }
-        if (name.trim() !== item.name) {
-          changes.push(`Name change to "${name.trim()}"`);
-        }
-        if (materialCategory !== item.materialCategory) {
-          changes.push(`Category: ${item.materialCategory} ➔ ${materialCategory}`);
-        }
-        if (parsedReorder !== item.reorderLevel) {
-          changes.push(`Threshold: ${item.reorderLevel} ➔ ${parsedReorder}`);
-        }
-
-        const changeSummary = changes.length > 0 ? changes.join('; ') : 'General item metadata adjustments';
-
-        await approvalsService.createApproval({
-          type: 'item_edit',
-          targetId: item.id,
-          targetTitle: `${item.name} (${item.sku})`,
-          requestedBy: user?.name || 'Staff User',
-          requestedByRole: user?.role || 'staff',
-          oldValue: `Current Price: ${formatINR(item.sellingPrice)}, Threshold: ${item.reorderLevel}`,
-          newValue: changeSummary,
-          reason: approvalReason.trim(),
-        });
-
-        addNotification({
-          title: 'Approval Request Submitted',
-          message: `Your changes to ${item.name} have been queued for administrator approval.`,
-          type: 'info',
-        });
-
-        onClose();
-      }
+      onItemUpdated(updated);
+      onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save changes';
       setErrorMsg(msg);
@@ -370,18 +316,6 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
-          {!isAdmin && (
-            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-500 dark:text-amber-400 flex items-start gap-2.5">
-              <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
-              <div>
-                <p className="font-semibold">Approval Workflow Active</p>
-                <p className="mt-0.5 text-amber-600 dark:text-amber-400/90">
-                  You are logged in as <strong className="capitalize">{user?.role}</strong>. Your submitted edits will generate an Approval Request and will take effect once reviewed by an Admin or Owner.
-                </p>
-              </div>
-            </div>
-          )}
-
           {errorMsg && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-500 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -747,22 +681,6 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
             />
           </div>
 
-          {!isAdmin && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Reason for Change (Sent with Approval Request) *
-              </label>
-              <textarea
-                rows={2}
-                value={approvalReason}
-                onChange={(e) => setApprovalReason(e.target.value)}
-                placeholder="e.g. Updating product photo, price adjustment, or SKU setup"
-                required
-                className="w-full px-3 py-2 text-sm template-input border border-amber-500/30 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-orange/30"
-              />
-            </div>
-          )}
-
           {/* Delete confirmation dialog */}
           {showDeleteConfirm && (
             <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 space-y-3">
@@ -822,18 +740,14 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting || isDeleting}
-                className={`px-5 py-2 text-sm font-bold text-white rounded-xl shadow-sm transition-all flex items-center gap-2 ${
-                  isAdmin
-                    ? 'bg-accent-orange hover:bg-accent-orange/90'
-                    : 'bg-amber-600 hover:bg-amber-700'
-                }`}
+                className="px-5 py-2 text-sm font-bold text-white rounded-xl shadow-sm transition-all flex items-center gap-2 bg-accent-orange hover:bg-accent-orange/90"
               >
                 {isSubmitting ? (
                   <span>Saving...</span>
                 ) : (
                   <>
-                    {isAdmin ? <CheckCircle2 className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-                    <span>{isAdmin ? 'Save Master Record' : 'Submit for Admin Approval'}</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Save Master Record</span>
                   </>
                 )}
               </button>

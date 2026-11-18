@@ -254,8 +254,6 @@ export const AllItemsPage: React.FC = () => {
             <thead className="bg-slate-50 dark:bg-[#181B25] text-slate-600 dark:text-[#9AA0AE] border-b border-slate-200/80 dark:border-white/[0.06]">
               <tr>
                 <th className="py-3 px-4 font-semibold">Product Description</th>
-                <th className="py-3 px-3 font-semibold">SKU / HSN</th>
-                <th className="py-3 px-3 font-semibold">Storage Location</th>
                 <th className="py-3 px-3 font-semibold text-right">Price (₹)</th>
                 <th className="py-3 px-3 font-semibold text-right">Available Stock</th>
                 <th className="py-3 px-3 font-semibold text-center">Status</th>
@@ -266,7 +264,7 @@ export const AllItemsPage: React.FC = () => {
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={7} className="py-3.5 px-4">
+                    <td colSpan={5} className="py-3.5 px-4">
                       <div className="h-4 bg-slate-100 dark:bg-white/[0.05] rounded w-full"></div>
                     </td>
                   </tr>
@@ -304,26 +302,6 @@ export const AllItemsPage: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    </td>
-
-                    {/* SKU & HSN */}
-                    <td className="py-3 px-3">
-                      <span className="font-mono font-bold text-brand-orange block">
-                        {item.sku}
-                      </span>
-                      <span className="text-[10px] text-cyan-400/80 font-mono">
-                        HSN {item.hsnCode}
-                      </span>
-                    </td>
-
-                    {/* Storage Location */}
-                    <td className="py-3 px-3">
-                      <span className="font-medium text-slate-800 dark:text-[#F2F4F8] block truncate max-w-[140px]">
-                        {item.warehouseName.split(' ')[0]} Hub
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {item.rackLocation}
-                      </span>
                     </td>
 
                     {/* Price */}
@@ -441,7 +419,7 @@ export const AllItemsPage: React.FC = () => {
                 ))
               ) : totalCount === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center">
+                  <td colSpan={5} className="py-16 text-center">
                     <div className="max-w-md mx-auto flex flex-col items-center justify-center space-y-3">
                       <div className="w-14 h-14 rounded-2xl bg-brand-orange/10 text-brand-orange flex items-center justify-center">
                         <Package className="w-7 h-7" strokeWidth={1.5} />
@@ -464,7 +442,7 @@ export const AllItemsPage: React.FC = () => {
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
+                  <td colSpan={5} className="py-12 text-center text-slate-400 space-y-2">
                     <Package className="w-8 h-8 mx-auto text-slate-400" />
                     <p className="font-semibold text-slate-600 dark:text-slate-300">No items match your criteria</p>
                     <p className="text-xs">Try resetting the filters or modifying your search terms.</p>

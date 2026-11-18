@@ -980,7 +980,7 @@ export const UsersPage: React.FC = () => {
                   {
                     role: 'admin' as Role,
                     title: 'System Administrator',
-                    desc: 'Full read/write across all modules, approvals, audit logs, and settings.',
+                    desc: 'Full read/write across all inventory, warehouse, sales, and purchasing modules.',
                   },
                   {
                     role: 'manager' as Role,

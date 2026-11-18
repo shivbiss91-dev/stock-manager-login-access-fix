@@ -60,6 +60,7 @@ export const UsersPage: React.FC = () => {
     name: '',
     email: '',
     phone: '',
+    password: '',
     role: 'staff' as Role,
     warehouseId: 'wh-001',
     loginMethod: 'google' as LoginMethod,
@@ -286,12 +287,22 @@ export const UsersPage: React.FC = () => {
       return;
     }
 
+    if (newUserData.loginMethod === 'email_password' && newUserData.password.length < 4) {
+      addNotification({
+        title: 'Password Required',
+        message: 'Please set a password of at least 4 characters for corporate email login.',
+        type: 'warning',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const created = await userService.createUser({
         name: newUserData.name.trim(),
         email: newUserData.email.trim(),
         phone: newUserData.phone.trim() || '+91 98200 00000',
+        password: newUserData.loginMethod === 'email_password' ? newUserData.password : undefined,
         role: newUserData.role,
         roleTitle:
           newUserData.role === 'admin'
@@ -333,6 +344,7 @@ export const UsersPage: React.FC = () => {
         name: '',
         email: '',
         phone: '',
+        password: '',
         role: 'staff',
         warehouseId: 'wh-001',
         loginMethod: 'google',
@@ -348,7 +360,11 @@ export const UsersPage: React.FC = () => {
   // Filtered users calculation
   const filteredUsers = users.filter((u) => {
     // Status filter
-    if (statusFilter !== 'all' && u.status !== statusFilter) return false;
+    if (statusFilter === 'deactivated') {
+      if (u.status !== 'deactivated' && u.status !== 'suspended') return false;
+    } else if (statusFilter !== 'all' && u.status !== statusFilter) {
+      return false;
+    }
 
     // Role filter
     if (roleFilter !== 'all' && u.role !== roleFilter) return false;
@@ -964,7 +980,7 @@ export const UsersPage: React.FC = () => {
                   {
                     role: 'admin' as Role,
                     title: 'System Administrator',
-                    desc: 'Full read/write across all modules, approvals, audit logs, and settings.',
+                    desc: 'Full read/write across all inventory, warehouse, sales, and purchasing modules.',
                   },
                   {
                     role: 'manager' as Role,
@@ -1117,6 +1133,23 @@ export const UsersPage: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {newUserData.loginMethod === 'email_password' && (
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Account Password *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={4}
+                    value={newUserData.password}
+                    onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                    placeholder="Minimum 4 characters"
+                    className="w-full px-3 py-2.5 template-input border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-orange/30"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">

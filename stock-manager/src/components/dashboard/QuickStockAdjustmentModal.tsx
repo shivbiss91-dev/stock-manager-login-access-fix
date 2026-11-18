@@ -7,18 +7,10 @@ import { ComputedInventoryItem } from '../../types/inventory';
 import { inventoryService } from '../../services/inventoryService';
 import { useAuthStore } from '../../store/authStore';
 import {
-  PREDEFINED_UNITS,
-  PredefinedUnit,
-  convertToBaseQuantity,
-  DEFAULT_PACKAGING_CONVERSIONS,
-  normalizeUnitCode,
-} from '../../utils/unitConversions';
-import {
   ArrowLeftRight,
   AlertCircle,
   CheckCircle2,
   AlertTriangle,
-  Layers,
   ShieldAlert,
   ArrowUpRight,
   ArrowDownRight,
@@ -52,7 +44,6 @@ export const QuickStockAdjustmentModal: React.FC<QuickStockAdjustmentModalProps>
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
-  const [selectedUnit, setSelectedUnit] = useState<PredefinedUnit>('PCS');
   const [quantity, setQuantity] = useState<number>(10);
   const [directTargetStock, setDirectTargetStock] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
@@ -64,8 +55,6 @@ export const QuickStockAdjustmentModal: React.FC<QuickStockAdjustmentModalProps>
   useEffect(() => {
     if (item && isOpen) {
       setAdjustmentType(initialMode);
-      const itemUnit = normalizeUnitCode(item.unit);
-      setSelectedUnit(itemUnit);
       setQuantity(10);
       setDirectTargetStock(item.currentStock);
       const now = new Date();
@@ -81,20 +70,15 @@ export const QuickStockAdjustmentModal: React.FC<QuickStockAdjustmentModalProps>
 
   if (!item) return null;
 
-  const conversions = item.packagingConversions || DEFAULT_PACKAGING_CONVERSIONS;
-
-  // Base quantity conversion calculations
+  // Manual 1:1 stock adjustment calculations (direct base units, no conversions)
   let deltaInBase = 0;
   let resultingStock = item.currentStock;
-  let enteredQuantityInBase = 0;
 
   if (adjustmentType === 'direct') {
-    enteredQuantityInBase = convertToBaseQuantity(directTargetStock, selectedUnit, conversions);
-    deltaInBase = enteredQuantityInBase - item.currentStock;
-    resultingStock = enteredQuantityInBase;
+    deltaInBase = directTargetStock - item.currentStock;
+    resultingStock = directTargetStock;
   } else {
-    enteredQuantityInBase = convertToBaseQuantity(quantity, selectedUnit, conversions);
-    deltaInBase = adjustmentType === 'add' ? enteredQuantityInBase : -enteredQuantityInBase;
+    deltaInBase = adjustmentType === 'add' ? quantity : -quantity;
     resultingStock = item.currentStock + deltaInBase;
   }
 
@@ -149,7 +133,7 @@ export const QuickStockAdjustmentModal: React.FC<QuickStockAdjustmentModalProps>
         adjustmentQuantity: adjustmentType === 'direct' ? directTargetStock : quantity,
         delta: deltaInBase,
         targetStock: adjustmentType === 'direct' ? resultingStock : undefined,
-        unit: selectedUnit,
+        unit: item.unit || 'PCS',
         reason: finalReason,
         notes: notes.trim(),
         date: adjustmentDate,
@@ -281,11 +265,11 @@ export const QuickStockAdjustmentModal: React.FC<QuickStockAdjustmentModalProps>
           </p>
         </div>
 
-        {/* Quantity & Unit of Measurement Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        {/* Manual Quantity Input (Direct 1:1 in base unit) */}
+        <div>
           {adjustmentType === 'direct' ? (
             <Input
-              label="New Exact Stock Count"
+              label={`New Exact Stock Count (${item.unit || 'PCS'})`}
               type="number"
               min={0}
               value={directTargetStock}
@@ -294,7 +278,11 @@ export const QuickStockAdjustmentModal: React.FC<QuickStockAdjustmentModalProps>
             />
           ) : (
             <Input
-              label={adjustmentType === 'add' ? 'Quantity to Inward (+)' : 'Quantity to Deduct (-)'}
+              label={
+                adjustmentType === 'add'
+                  ? `Manual Quantity to Inward (+) (${item.unit || 'PCS'})`
+                  : `Manual Quantity to Deduct (-) (${item.unit || 'PCS'})`
+              }
               type="number"
               min={1}
               value={quantity}
@@ -302,48 +290,7 @@ export const QuickStockAdjustmentModal: React.FC<QuickStockAdjustmentModalProps>
               required
             />
           )}
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Unit of Measurement *
-            </label>
-            <select
-              value={selectedUnit}
-              onChange={(e) => setSelectedUnit(e.target.value as PredefinedUnit)}
-              className="w-full text-xs rounded-xl border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#1A1D26] px-3.5 py-2.5 text-slate-800 dark:text-[#F2F4F8] focus:outline-none focus:ring-2 focus:ring-accent-orange cursor-pointer"
-            >
-              {PREDEFINED_UNITS.map((u) => (
-                <option key={u.code} value={u.code} className="bg-white dark:bg-[#12151D]">
-                  {u.label} {u.isPackUnit ? `(${u.description})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
-
-        {/* Live Packaging Conversion Hint */}
-        {selectedUnit !== 'PCS' && selectedUnit !== 'UNT' && (
-          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/40 text-xs text-blue-700 dark:text-blue-300">
-            <Layers className="w-4 h-4 flex-shrink-0" />
-            <span>
-              Packaging conversion:{' '}
-              <strong>
-                1 {selectedUnit} ={' '}
-                {selectedUnit === 'DOZ'
-                  ? conversions.dozenMultiplier
-                  : selectedUnit === 'CTN'
-                  ? conversions.cartonMultiplier
-                  : selectedUnit === 'BOX'
-                  ? conversions.boxMultiplier
-                  : conversions.bundleMultiplier}{' '}
-                {conversions.baseUnit || 'PCS'}
-              </strong>
-              {adjustmentType !== 'direct' && (
-                <> (Total: {enteredQuantityInBase.toLocaleString('en-IN')} {conversions.baseUnit || 'PCS'})</>
-              )}
-            </span>
-          </div>
-        )}
 
         {/* Audit Notes */}
         <Input

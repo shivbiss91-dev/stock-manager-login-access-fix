@@ -208,11 +208,11 @@ export const LoginPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10 text-xs text-slate-300">
             <div className="flex items-center gap-2.5">
               <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">✓</div>
-              <span>AS-2 Inventory Valuation</span>
+              <span>Real-Time Stock Management</span>
             </div>
             <div className="flex items-center gap-2.5">
               <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">✓</div>
-              <span>CGST, SGST & IGST Ledgers</span>
+              <span>Multi-Warehouse Operations</span>
             </div>
             <div className="flex items-center gap-2.5">
               <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">✓</div>
@@ -220,7 +220,7 @@ export const LoginPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-2.5">
               <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">✓</div>
-              <span>Audit Trail & Ledger Logs</span>
+              <span>Direct Stock Adjustment & Calibration</span>
             </div>
           </div>
         </div>

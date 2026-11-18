@@ -69,19 +69,6 @@ export const APP_MODULES: ModuleDefinition[] = [
     description: 'Tax invoices, e-Way bills, statutory GST billing, and supplier bills',
     path: '/sales/invoices',
   },
-  {
-    id: 'module_reports',
-    label: 'Reports',
-    description: 'Financial intelligence, inventory valuation, GST reports, and audits',
-    path: '/reports',
-  },
-  {
-    id: 'module_settings',
-    label: 'Settings',
-    description: 'Company profile, statutory configuration, and system preferences (Admin-only unless delegated)',
-    path: '/settings',
-    adminOnlyByDefault: true,
-  },
 ];
 
 export const DEFAULT_ROLE_MODULES: Record<Role, AppPermissionModule[]> = {
@@ -93,8 +80,6 @@ export const DEFAULT_ROLE_MODULES: Record<Role, AppPermissionModule[]> = {
     'module_transfers',
     'module_orders',
     'module_invoices',
-    'module_reports',
-    'module_settings',
   ],
   manager: [
     'module_dashboard',
@@ -104,7 +89,6 @@ export const DEFAULT_ROLE_MODULES: Record<Role, AppPermissionModule[]> = {
     'module_transfers',
     'module_orders',
     'module_invoices',
-    'module_reports',
   ],
   staff: [
     'module_dashboard',
@@ -114,12 +98,10 @@ export const DEFAULT_ROLE_MODULES: Record<Role, AppPermissionModule[]> = {
     'module_transfers',
     'module_orders',
     'module_invoices',
-    'module_reports',
   ],
   viewer: [
     'module_dashboard',
     'module_items',
-    'module_reports',
   ],
 };
 
