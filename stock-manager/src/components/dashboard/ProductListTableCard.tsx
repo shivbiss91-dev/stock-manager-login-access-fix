@@ -190,33 +190,20 @@ export const ProductListTableCard: React.FC<ProductListTableCardProps> = ({
     document.body.removeChild(link);
   };
 
-  const getStatusBadge = (status: StockStatus) => {
-    switch (status) {
-      case 'in_stock':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-            In Stock
-          </span>
-        );
-      case 'low_stock':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">
-            Low Stock
-          </span>
-        );
-      case 'out_of_stock':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">
-            Out of Stock
-          </span>
-        );
-      case 'dead_stock':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">
-            Dead Stock
-          </span>
-        );
+  const getStatusBadge = (status: StockStatus, currentStock?: number) => {
+    const isOutOfStock = status === 'out_of_stock' || (currentStock !== undefined && currentStock <= 0);
+    if (isOutOfStock) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">
+          Out of Stock
+        </span>
+      );
     }
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+        In Stock
+      </span>
+    );
   };
 
   const getDemandBadge = (velocity: 'High' | 'Medium' | 'Low') => {
@@ -617,7 +604,7 @@ export const ProductListTableCard: React.FC<ProductListTableCardProps> = ({
                     {/* Stock Status Pill */}
                     {visibleColumns.status && (
                       <td className="px-4 py-3 text-center whitespace-nowrap">
-                        {getStatusBadge(item.stockStatus)}
+                        {getStatusBadge(item.stockStatus, item.currentStock)}
                       </td>
                     )}
 

@@ -315,19 +315,15 @@ export const ItemDetailPage: React.FC = () => {
                 {item.sku}
               </span>
 
-              {/* Status Badge */}
+              {/* Status Badge (Only In Stock or Out of Stock) */}
               <span
                 className={`px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${
-                  item.stockStatus === 'in_stock'
+                  item.currentStock > 0 && item.stockStatus !== 'out_of_stock'
                     ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
-                    : item.stockStatus === 'low_stock'
-                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
-                    : item.stockStatus === 'dead_stock'
-                    ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300'
                     : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
                 }`}
               >
-                ● {item.stockStatus.replace('_', ' ')}
+                ● {item.currentStock > 0 && item.stockStatus !== 'out_of_stock' ? 'In Stock' : 'Out of Stock'}
               </span>
 
               <span className="text-xs text-slate-400 ml-auto flex items-center gap-1">

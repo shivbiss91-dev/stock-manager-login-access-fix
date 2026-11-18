@@ -161,9 +161,15 @@ export const inventoryService = {
       total: computed.length,
     };
 
-    // Filter by stock status
+    // Filter by stock status (In Stock = currentStock > 0, Out of Stock = currentStock <= 0)
     if (stockStatus && stockStatus !== 'all') {
-      computed = computed.filter((item) => item.stockStatus === stockStatus);
+      if (stockStatus === 'in_stock') {
+        computed = computed.filter((item) => item.currentStock > 0);
+      } else if (stockStatus === 'out_of_stock') {
+        computed = computed.filter((item) => item.currentStock <= 0);
+      } else {
+        computed = computed.filter((item) => item.stockStatus === stockStatus);
+      }
     }
 
     // Filter by supplier

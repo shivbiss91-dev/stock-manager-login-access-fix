@@ -233,14 +233,12 @@ export const AllItemsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Stock Status Filter Tabs */}
+        {/* Stock Status Filter Tabs (Only In Stock & Out of Stock) */}
         <div className="flex items-center gap-2 overflow-x-auto pt-2 border-t border-slate-100 dark:border-white/[0.04]">
           {[
             { id: 'all', label: 'All Items', count: statusCounts.total },
-            { id: 'in_stock', label: 'In Stock', count: statusCounts.inStock },
-            { id: 'low_stock', label: 'Low Stock', count: statusCounts.lowStock },
+            { id: 'in_stock', label: 'In Stock', count: Math.max(0, statusCounts.total - statusCounts.outOfStock) },
             { id: 'out_of_stock', label: 'Out of Stock', count: statusCounts.outOfStock },
-            { id: 'dead_stock', label: 'Dead Stock (90d+)', count: statusCounts.deadStock },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -398,20 +396,16 @@ export const AllItemsPage: React.FC = () => {
                       </span>
                     </td>
 
-                    {/* Status Badge */}
+                    {/* Status Badge (Only In Stock or Out of Stock) */}
                     <td className="py-3 px-3 text-center">
                       <span
                         className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${
-                          item.stockStatus === 'in_stock'
+                          item.currentStock > 0
                             ? 'bg-[#0A261D] text-[#10B981] border border-[#10B981]/40'
-                            : item.stockStatus === 'low_stock'
-                            ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                            : item.stockStatus === 'dead_stock'
-                            ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
                             : 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
                         }`}
                       >
-                        {item.stockStatus.replace('_', ' ')}
+                        {item.currentStock > 0 ? 'In Stock' : 'Out of Stock'}
                       </span>
                     </td>
 

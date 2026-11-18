@@ -23,16 +23,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({
   const isFav = isFavourite(item.id);
 
   const getStatusColor = (status: ComputedInventoryItem['stockStatus']) => {
-    switch (status) {
-      case 'in_stock':
-        return { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', label: 'In Stock' };
-      case 'low_stock':
-        return { dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400', label: 'Low Stock' };
-      case 'out_of_stock':
-        return { dot: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-400', label: 'Out of Stock' };
-      case 'dead_stock':
-        return { dot: 'bg-violet-500', text: 'text-violet-700 dark:text-violet-400', label: 'Dead Stock' };
+    if (status === 'out_of_stock' || item.currentStock <= 0) {
+      return { dot: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-400', label: 'Out of Stock' };
     }
+    return { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', label: 'In Stock' };
   };
 
   const statusConfig = getStatusColor(item.stockStatus);

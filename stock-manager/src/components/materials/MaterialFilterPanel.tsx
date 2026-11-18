@@ -222,10 +222,8 @@ export const MaterialFilterPanel: React.FC<MaterialFilterPanelProps> = ({
         {openSections.stock && (
           <div className="space-y-1.5 pt-1">
             {[
-              { id: 'in_stock' as const, label: 'In Stock', count: statusCounts.inStock, dotColor: 'bg-emerald-500' },
-              { id: 'low_stock' as const, label: 'Low Stock', count: statusCounts.lowStock, dotColor: 'bg-amber-500' },
+              { id: 'in_stock' as const, label: 'In Stock', count: Math.max(0, statusCounts.total - statusCounts.outOfStock), dotColor: 'bg-emerald-500' },
               { id: 'out_of_stock' as const, label: 'Out of Stock', count: statusCounts.outOfStock, dotColor: 'bg-rose-500' },
-              { id: 'dead_stock' as const, label: 'Dead Stock (>90d)', count: statusCounts.deadStock, dotColor: 'bg-violet-500' },
             ].map((item) => {
               const isChecked = filters.stockStatuses.includes(item.id);
               return (

@@ -360,14 +360,12 @@ export const MaterialCategoryPage: React.FC = () => {
 
         {/* Quick Tabs & View Toggles Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-          {/* Quick Tabs */}
+          {/* Quick Tabs (Only In Stock & Out of Stock) */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {[
               { id: 'all', label: 'All Items', count: statusCounts.total },
-              { id: 'low_stock', label: 'Low Stock', count: statusCounts.lowStock },
-              { id: 'high_velocity', label: 'High Velocity', count: null },
+              { id: 'in_stock', label: 'In Stock', count: Math.max(0, statusCounts.total - statusCounts.outOfStock) },
               { id: 'out_of_stock', label: 'Out of Stock', count: statusCounts.outOfStock },
-              { id: 'dead_stock', label: 'Dead Stock (>90d)', count: statusCounts.deadStock },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (
