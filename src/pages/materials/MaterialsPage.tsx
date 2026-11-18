@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { formatINR } from '../../utils/formatINR';
 import { MaterialCategory } from '../../types/inventory';
+import { ProductImage } from '../../components/common/ProductImage';
 import {
   Layers,
   TrendingUp,
@@ -146,10 +147,12 @@ export const MaterialsPage: React.FC = () => {
               >
                 {/* Hero Image Header with Gradient Overlay */}
                 <div className="relative h-40 w-full overflow-hidden bg-slate-900">
-                  <img
+                  <ProductImage
                     src={cat.imageUrl}
                     alt={cat.name}
+                    category={cat.id}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    fallbackIconSize={32}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
 

@@ -63,22 +63,36 @@ export const AllItemsPage: React.FC = () => {
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<ComputedInventoryItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDeleteItem = async () => {
-    if (!deleteConfirmItem) return;
-    setIsDeleting(true);
-    try {
-      await inventoryService.deleteItem(deleteConfirmItem.id);
-      const res = await inventoryService.getItems({
+  // Reload items helper
+  const reloadItems = () => {
+    setIsLoading(true);
+    return inventoryService
+      .getItems({
         page,
         pageSize: 20,
         search: searchParam || undefined,
         category: categoryParam !== 'all' ? categoryParam : undefined,
         stockStatus: statusParam !== 'all' ? statusParam : undefined,
+      })
+      .then((res) => {
+        setItems(res.items);
+        setTotalCount(res.totalCount);
+        setTotalPages(res.totalPages);
+        setStatusCounts(res.statusCounts);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load items:', err);
+        setIsLoading(false);
       });
-      setItems(res.items);
-      setTotalCount(res.totalCount);
-      setTotalPages(res.totalPages);
-      setStatusCounts(res.statusCounts);
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deleteConfirmItem) return;
+    setIsDeleting(true);
+    try {
+      await inventoryService.deleteItem(deleteConfirmItem.id);
+      await reloadItems();
       setDeleteConfirmItem(null);
     } catch (err) {
       console.error('Failed to delete item:', err);
@@ -89,34 +103,7 @@ export const AllItemsPage: React.FC = () => {
 
   // Load items
   useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
-
-    inventoryService
-      .getItems({
-        page,
-        pageSize: 20,
-        search: searchParam || undefined,
-        category: categoryParam !== 'all' ? categoryParam : undefined,
-        stockStatus: statusParam !== 'all' ? statusParam : undefined,
-      })
-      .then((res) => {
-        if (isMounted) {
-          setItems(res.items);
-          setTotalCount(res.totalCount);
-          setTotalPages(res.totalPages);
-          setStatusCounts(res.statusCounts);
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load items:', err);
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
+    reloadItems();
   }, [page, searchParam, categoryParam, statusParam]);
 
   // Handle Search input
@@ -285,6 +272,7 @@ export const AllItemsPage: React.FC = () => {
               <tr>
                 <th className="py-3 px-4 font-semibold">Product Description</th>
                 <th className="py-3 px-3 font-semibold">SKU / HSN</th>
+                <th className="py-3 px-3 font-semibold">Storage Location</th>
                 <th className="py-3 px-3 font-semibold text-right">Price (₹)</th>
                 <th className="py-3 px-3 font-semibold text-right">Available Stock</th>
                 <th className="py-3 px-3 font-semibold text-center">Status</th>
@@ -295,7 +283,7 @@ export const AllItemsPage: React.FC = () => {
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={6} className="py-3.5 px-4">
+                    <td colSpan={7} className="py-3.5 px-4">
                       <div className="h-4 bg-slate-100 dark:bg-white/[0.05] rounded w-full"></div>
                     </td>
                   </tr>
@@ -306,19 +294,14 @@ export const AllItemsPage: React.FC = () => {
                     {/* Product Name & Thumbnail */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#121824] border border-white/10 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden p-1">
-                          {item.images[0] ? (
-                            <img
-                              src={item.images[0]}
-                              alt={item.name}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                          ) : (
-                            <div className="w-6 h-7 rounded border border-blue-400/40 bg-blue-500/20 flex flex-col items-center pt-0.5">
-                              <div className="w-2.5 h-1 bg-blue-400 rounded-sm mb-1" />
-                              <div className="w-3 h-3 rounded-full bg-blue-300/40" />
-                            </div>
-                          )}
+                        <div className="w-10 h-10 rounded-xl bg-[#121824] border border-white/10 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden p-0.5">
+                          <ProductImage
+                            src={item.images[0]}
+                            alt={item.name}
+                            category={item.materialCategory}
+                            className="w-full h-full object-cover rounded-lg"
+                            fallbackIconSize={18}
+                          />
                         </div>
                         <div className="min-w-0">
                           <Link
@@ -450,6 +433,13 @@ export const AllItemsPage: React.FC = () => {
                           className="p-1.5 hover:text-accent-orange hover:bg-white/10 rounded-lg transition"
                           title="Stock Adjustment & Calibration"
                         >
+                          <SlidersHorizontal className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setSelectedItemForEdit(item)}
+                          className="p-1.5 hover:text-brand-orange hover:bg-white/10 rounded-lg transition"
+                          title="Edit Product Details"
+                        >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
@@ -472,7 +462,7 @@ export const AllItemsPage: React.FC = () => {
                 ))
               ) : totalCount === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center">
+                  <td colSpan={7} className="py-16 text-center">
                     <div className="max-w-md mx-auto flex flex-col items-center justify-center space-y-3">
                       <div className="w-14 h-14 rounded-2xl bg-brand-orange/10 text-brand-orange flex items-center justify-center">
                         <Package className="w-7 h-7" strokeWidth={1.5} />
@@ -495,7 +485,7 @@ export const AllItemsPage: React.FC = () => {
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 space-y-2">
+                  <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
                     <Package className="w-8 h-8 mx-auto text-slate-400" />
                     <p className="font-semibold text-slate-600 dark:text-slate-300">No items match your criteria</p>
                     <p className="text-xs">Try resetting the filters or modifying your search terms.</p>
@@ -541,10 +531,7 @@ export const AllItemsPage: React.FC = () => {
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           onItemAdded={() => {
-            inventoryService.getItems({ page: 1, pageSize: 20 }).then((res) => {
-              setItems(res.items);
-              setTotalCount(res.totalCount);
-            });
+            reloadItems();
           }}
         />
       )}
@@ -580,7 +567,7 @@ export const AllItemsPage: React.FC = () => {
           initialMode={adjustmentMode}
           onClose={() => setAdjustmentItem(null)}
           onSuccess={() => {
-            inventoryService.getItems({ page, pageSize: 20 }).then((res) => setItems(res.items));
+            reloadItems();
           }}
         />
       )}

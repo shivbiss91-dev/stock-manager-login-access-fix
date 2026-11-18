@@ -507,11 +507,13 @@ export const ProductListTableCard: React.FC<ProductListTableCardProps> = ({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-[#1A1D26] border border-slate-200 dark:border-white/[0.08] flex items-center justify-center flex-shrink-0 text-brand-orange overflow-hidden">
-                            {item.images[0] ? (
-                              <img src={item.images[0]} alt={item.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <Box className="w-4 h-4" strokeWidth={1.5} />
-                            )}
+                            <ProductImage
+                              src={item.images[0]}
+                              alt={item.name}
+                              category={item.materialCategory}
+                              className="w-full h-full object-cover"
+                              fallbackIconSize={14}
+                            />
                           </div>
                           <div className="min-w-0 max-w-[240px]">
                             <p

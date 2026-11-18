@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, ImageOff } from 'lucide-react';
+import { Package } from 'lucide-react';
 
 interface ProductImageProps {
   src?: string | null;
@@ -11,7 +11,7 @@ interface ProductImageProps {
 }
 
 /**
- * Normalizes relative URLs so they work across both root hosting and subpath hosting (e.g. GitHub Pages /stock-manager/).
+ * Normalizes relative URLs so they work across both root hosting and subpath hosting (e.g. GitHub Pages /stock-manager-login-access-fix/).
  */
 export function normalizeProductImageUrl(url?: string | null): string {
   if (!url || typeof url !== 'string' || !url.trim()) return '';
@@ -27,14 +27,29 @@ export function normalizeProductImageUrl(url?: string | null): string {
     return trimmed;
   }
 
-  // Handle leading slash for GitHub Pages or relative base paths
-  const base = import.meta.env.BASE_URL || './';
+  // Detect base path
+  let base = import.meta.env.BASE_URL || './';
+
+  // If running in browser and on a subpath (e.g. GitHub Pages /stock-manager-login-access-fix/)
+  if (typeof window !== 'undefined' && window.location) {
+    const pathname = window.location.pathname.replace(/\/+$/, '');
+    if (pathname && pathname !== '/' && !base.startsWith(pathname)) {
+      base = `${pathname}/`;
+    }
+  }
+
+  const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+
   if (trimmed.startsWith('/')) {
-    const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
     return `${cleanBase}${trimmed}`;
   }
 
-  return trimmed;
+  // If relative path like 'products/foo.svg' or './products/foo.svg'
+  if (trimmed.startsWith('./')) {
+    return `${cleanBase}/${trimmed.slice(2)}`;
+  }
+
+  return `${cleanBase}/${trimmed}`;
 }
 
 /**
@@ -42,21 +57,24 @@ export function normalizeProductImageUrl(url?: string | null): string {
  */
 export function getCategoryFallbackSvg(category?: string | null): string {
   const norm = (category || '').toLowerCase().replace(/[\s-]/g, '_');
-  const base = import.meta.env.BASE_URL || './';
-  const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
-
+  let relPath = '';
   switch (norm) {
     case 'card_holder':
-      return `${cleanBase}/products/card-holder.svg`;
+      relPath = '/products/card-holder.svg';
+      break;
     case 'lanyard':
-      return `${cleanBase}/products/lanyard.svg`;
+      relPath = '/products/lanyard.svg';
+      break;
     case 'hook':
-      return `${cleanBase}/products/hook.svg`;
+      relPath = '/products/hook.svg';
+      break;
     case 'button_bag':
-      return `${cleanBase}/products/button-bag.svg`;
+      relPath = '/products/button-bag.svg';
+      break;
     default:
       return '';
   }
+  return normalizeProductImageUrl(relPath);
 }
 
 export const ProductImage: React.FC<ProductImageProps> = ({
@@ -67,32 +85,29 @@ export const ProductImage: React.FC<ProductImageProps> = ({
   containerClassName = '',
   fallbackIconSize = 18,
 }) => {
-  const [hasError, setHasError] = useState(false);
-  const normalizedSrc = normalizeProductImageUrl(src);
+  const [currentSrc, setCurrentSrc] = useState<string>('');
+  const [fallbackAttempted, setFallbackAttempted] = useState(false);
+  const [isFailed, setIsFailed] = useState(false);
 
-  // Reset error state if the src prop changes
   useEffect(() => {
-    setHasError(false);
-  }, [src]);
+    const initial = normalizeProductImageUrl(src) || getCategoryFallbackSvg(category);
+    setCurrentSrc(initial);
+    setFallbackAttempted(false);
+    setIsFailed(!initial);
+  }, [src, category]);
 
-  // If no source image or image failed to load
-  if (!normalizedSrc || hasError) {
+  const handleError = () => {
     const categoryFallback = getCategoryFallbackSvg(category);
-
-    // If we have a category fallback and hasn't errored on that
-    if (categoryFallback && !hasError && !src) {
-      return (
-        <img
-          src={categoryFallback}
-          alt={alt}
-          className={`${className} bg-slate-900/60 border border-slate-700/40`}
-          onError={() => setHasError(true)}
-          loading="lazy"
-        />
-      );
+    if (!fallbackAttempted && categoryFallback && currentSrc !== categoryFallback) {
+      setFallbackAttempted(true);
+      setCurrentSrc(categoryFallback);
+    } else {
+      setIsFailed(true);
     }
+  };
 
-    // Professional SVG placeholder: Dark theme with subtle orange accent, zero broken icons
+  // If failed or no source available, render professional SVG placeholder
+  if (isFailed || !currentSrc) {
     return (
       <div
         className={`${className} ${containerClassName} bg-slate-900/80 border border-slate-700/50 flex flex-col items-center justify-center text-slate-400 select-none flex-shrink-0 overflow-hidden relative group`}
@@ -111,10 +126,10 @@ export const ProductImage: React.FC<ProductImageProps> = ({
 
   return (
     <img
-      src={normalizedSrc}
+      src={currentSrc}
       alt={alt}
       className={`${className} bg-slate-900/40 border border-slate-700/40 flex-shrink-0`}
-      onError={() => setHasError(true)}
+      onError={handleError}
       loading="lazy"
     />
   );

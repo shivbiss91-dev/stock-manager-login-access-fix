@@ -13,6 +13,7 @@ import {
 } from '../../data/materialCategories';
 import { MaterialCategoryInfo } from '../../types/inventory';
 import { useAuthStore } from '../../store/authStore';
+import { ProductImage } from '../common/ProductImage';
 import { PackagePlus, Image as ImageIcon, Upload, Trash2, Plus, X } from 'lucide-react';
 import {
   PREDEFINED_UNITS,
@@ -258,14 +259,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
             {/* Interactive Image Preview Box */}
             <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-dashed border-slate-300 dark:border-white/[0.12] bg-white dark:bg-[#0E1118] flex-shrink-0 flex items-center justify-center group shadow-inner">
               {imageUrl ? (
-                <img
+                <ProductImage
                   src={imageUrl}
                   alt={name || 'Product preview'}
+                  category={selectedCategory}
                   className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src =
-                      selectedCategoryMeta?.imageUrl || '/products/card-holder.svg';
-                  }}
+                  fallbackIconSize={20}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center text-slate-400">

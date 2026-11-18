@@ -21,6 +21,8 @@ import {
   KeyRound,
   CheckCircle2,
   Smartphone,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -63,6 +65,8 @@ export const LoginPage: React.FC = () => {
   const [dispatchedOtpHint, setDispatchedOtpHint] = useState<string | null>(null);
 
   // Common UI states
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showStaffPassword, setShowStaffPassword] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
@@ -298,9 +302,24 @@ export const LoginPage: React.FC = () => {
 
                 <Input
                   label="Password"
-                  type="password"
+                  type={showAdminPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   leftIcon={<Lock className="w-4 h-4" strokeWidth={1.5} />}
+                  rightIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPassword((prev) => !prev)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-200 transition focus:outline-none"
+                      aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                      title={showAdminPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showAdminPassword ? (
+                        <EyeOff className="w-4 h-4 text-brand-orange" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  }
                   error={adminLoginForm.formState.errors.password?.message}
                   {...adminLoginForm.register('password')}
                 />
@@ -610,9 +629,24 @@ export const LoginPage: React.FC = () => {
 
                   <Input
                     label="Account Password"
-                    type="password"
+                    type={showStaffPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     leftIcon={<Lock className="w-4 h-4" strokeWidth={1.5} />}
+                    rightIcon={
+                      <button
+                        type="button"
+                        onClick={() => setShowStaffPassword((prev) => !prev)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-200 transition focus:outline-none"
+                        aria-label={showStaffPassword ? 'Hide password' : 'Show password'}
+                        title={showStaffPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showStaffPassword ? (
+                          <EyeOff className="w-4 h-4 text-brand-orange" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    }
                     error={loginForm.formState.errors.password?.message}
                     {...loginForm.register('password')}
                   />
