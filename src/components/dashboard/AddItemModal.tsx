@@ -262,7 +262,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
                 <ProductImage
                   src={imageUrl}
                   alt={name || 'Product preview'}
-                  category={selectedCategory}
+                  category={category}
                   className="w-full h-full object-cover transition-transform group-hover:scale-105"
                   fallbackIconSize={20}
                 />
