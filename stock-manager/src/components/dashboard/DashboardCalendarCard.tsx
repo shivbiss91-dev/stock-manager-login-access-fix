@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Minus,
   Clock,
   FileText,
   Truck,
@@ -23,7 +24,9 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { calendarService } from '../../services/calendarService';
+import { inventoryService } from '../../services/inventoryService';
 import { CalendarEvent, CalendarViewMode, CalendarEventType } from '../../types/calendar';
+import { ComputedInventoryItem } from '../../types/inventory';
 import { useAuthStore } from '../../store/authStore';
 
 type EventFilterType = 'all' | 'stock' | 'business' | 'reminder';
@@ -52,6 +55,37 @@ export const DashboardCalendarCard: React.FC = () => {
   const [reminderDate, setReminderDate] = useState(todayIST.dateString);
   const [reminderNotes, setReminderNotes] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
+
+  // Day Operations & Action Modal state
+  const [isDayModalOpen, setIsDayModalOpen] = useState(false);
+  const [dayModalTab, setDayModalTab] = useState<'view' | 'add_stock' | 'remove_stock' | 'reminder'>('view');
+  const [allItems, setAllItems] = useState<ComputedInventoryItem[]>([]);
+
+  // Quick Stock Adjustment state
+  const [stockItemId, setStockItemId] = useState('');
+  const [stockQty, setStockQty] = useState('');
+  const [stockReason, setStockReason] = useState('');
+  const [stockError, setStockError] = useState<string | null>(null);
+  const [stockSuccess, setStockSuccess] = useState<string | null>(null);
+  const [isSubmittingStock, setIsSubmittingStock] = useState(false);
+
+  // Load all items for stock selection
+  useEffect(() => {
+    inventoryService.getAllItems().then((items) => {
+      setAllItems(items);
+      if (items.length > 0) {
+        setStockItemId(items[0].id);
+      }
+    });
+  }, []);
+
+  const handleDateClick = (dateStr: string) => {
+    setSelectedDateStr(dateStr);
+    setIsDayModalOpen(true);
+    setDayModalTab('view');
+    setStockError(null);
+    setStockSuccess(null);
+  };
 
   const loadEvents = async () => {
     setIsLoading(true);
@@ -473,7 +507,7 @@ export const DashboardCalendarCard: React.FC = () => {
               return (
                 <div
                   key={dateStr}
-                  onClick={() => setSelectedDateStr(dateStr)}
+                  onClick={() => handleDateClick(dateStr)}
                   className={`min-h-[70px] sm:min-h-[85px] p-1.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
                       ? 'bg-brand-orange/10 border-brand-orange ring-1 ring-brand-orange/40'
@@ -546,7 +580,7 @@ export const DashboardCalendarCard: React.FC = () => {
             return (
               <div
                 key={w.dateString}
-                onClick={() => setSelectedDateStr(w.dateString)}
+                onClick={() => handleDateClick(w.dateString)}
                 className={`p-3 rounded-2xl border transition-all cursor-pointer min-h-[220px] flex flex-col justify-between ${
                   isSelected
                     ? 'bg-brand-orange/10 border-brand-orange ring-1 ring-brand-orange/40'
@@ -989,6 +1023,390 @@ export const DashboardCalendarCard: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Interactive Day Operations & Action Modal */}
+      {isDayModalOpen && (
+        <Modal
+          isOpen={isDayModalOpen}
+          onClose={() => setIsDayModalOpen(false)}
+          title={`Day Operations: ${new Date(selectedDateStr).toLocaleDateString('en-IN', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          })}`}
+          subtitle="Directly view updates, log stock movements, or add and remove reminders for this date."
+          size="lg"
+        >
+          <div className="space-y-4">
+            {/* Modal Tabs: View Updates | Add Stock | Remove Stock | Add Reminder */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-white/[0.04] rounded-xl border border-slate-200 dark:border-white/[0.08] text-xs overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setDayModalTab('view');
+                  setStockError(null);
+                  setStockSuccess(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  dayModalTab === 'view'
+                    ? 'bg-brand-orange text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>Updates ({selectedDayEvents.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDayModalTab('add_stock');
+                  setStockError(null);
+                  setStockSuccess(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  dayModalTab === 'add_stock'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Stock (+)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDayModalTab('remove_stock');
+                  setStockError(null);
+                  setStockSuccess(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  dayModalTab === 'remove_stock'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-rose-600 dark:text-rose-400 hover:bg-rose-500/10'
+                }`}
+              >
+                <Minus className="w-3.5 h-3.5" />
+                <span>Remove Stock (-)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDayModalTab('reminder');
+                  setStockError(null);
+                  setStockSuccess(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  dayModalTab === 'reminder'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-amber-600 dark:text-amber-400 hover:bg-amber-500/10'
+                }`}
+              >
+                <Bell className="w-3.5 h-3.5" />
+                <span>Add Reminder</span>
+              </button>
+            </div>
+
+            {/* TAB 1: VIEW UPDATES & DIRECTLY REMOVE */}
+            {dayModalTab === 'view' && (
+              <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+                {selectedDayEvents.length > 0 ? (
+                  selectedDayEvents.map((ev) => {
+                    const badge = getEventBadge(ev.type);
+                    return (
+                      <div
+                        key={ev.id}
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/[0.06] flex flex-col justify-between gap-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border ${badge.bg}`}>
+                              {badge.icon}
+                            </div>
+                            <div className="min-w-0">
+                              <h5 className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                                {ev.title}
+                              </h5>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                                <span className={`px-1.5 py-0.2 rounded font-bold uppercase ${badge.bg}`}>
+                                  {badge.label}
+                                </span>
+                                {ev.time && (
+                                  <span className="font-mono">{ev.time}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {ev.linkedPath && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsDayModalOpen(false);
+                                  navigate(ev.linkedPath!);
+                                }}
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-brand-orange/15 text-brand-orange hover:bg-brand-orange hover:text-white transition-colors flex items-center gap-1"
+                              >
+                                <span>Open</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            )}
+
+                            {/* Direct Remove Action */}
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await calendarService.deleteEvent(ev.id);
+                                await loadEvents();
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
+                              title="Directly remove this event/entry"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {ev.description && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 bg-white/60 dark:bg-white/[0.02] p-2 rounded-lg border border-slate-100 dark:border-white/[0.03]">
+                            {ev.description}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-8 text-center text-slate-400">
+                    <CalendarDays className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      No updates logged for this date.
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Choose "Add Stock", "Remove Stock", or "Add Reminder" above to directly log an update.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2 & 3: DIRECTLY ADD OR REMOVE STOCK */}
+            {(dayModalTab === 'add_stock' || dayModalTab === 'remove_stock') && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const qtyNum = parseFloat(stockQty);
+                  if (isNaN(qtyNum) || qtyNum <= 0) {
+                    setStockError('Please enter a valid quantity greater than 0');
+                    return;
+                  }
+                  if (!stockItemId) {
+                    setStockError('Please select a product');
+                    return;
+                  }
+                  setIsSubmittingStock(true);
+                  setStockError(null);
+                  try {
+                    const isAdd = dayModalTab === 'add_stock';
+                    await inventoryService.updateStock(
+                      stockItemId,
+                      {
+                        delta: isAdd ? qtyNum : -qtyNum,
+                        mode: isAdd ? 'add' : 'deduct',
+                        adjustmentQuantity: qtyNum,
+                        reason: stockReason.trim() || (isAdd ? 'Manual Stock Inward' : 'Manual Stock Outward'),
+                        date: selectedDateStr,
+                        userName: user?.name || 'Administrator',
+                        userRole: user?.role || 'admin',
+                      }
+                    );
+                    setStockQty('');
+                    setStockReason('');
+                    setStockSuccess(
+                      `Successfully ${isAdd ? 'added' : 'deducted'} ${qtyNum} units for ${selectedDateStr}!`
+                    );
+                    await loadEvents();
+                    window.dispatchEvent(new CustomEvent('stock_updated'));
+                    setTimeout(() => {
+                      setDayModalTab('view');
+                    }, 900);
+                  } catch (err) {
+                    setStockError(err instanceof Error ? err.message : 'Failed to update stock');
+                  } finally {
+                    setIsSubmittingStock(false);
+                  }
+                }}
+                className="space-y-3.5"
+              >
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Select Product *
+                  </label>
+                  <select
+                    value={stockItemId}
+                    onChange={(e) => setStockItemId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-[#1A1D26] border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-orange"
+                  >
+                    {allItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} ({item.sku}) — Available: {item.currentStock} {item.unit || 'PCS'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    {dayModalTab === 'add_stock' ? 'Quantity to Add (+)' : 'Quantity to Deduct (-)'} *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={stockQty}
+                    onChange={(e) => setStockQty(e.target.value)}
+                    placeholder="e.g. 50"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-[#1A1D26] border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Reason / Notes (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={stockReason}
+                    onChange={(e) => setStockReason(e.target.value)}
+                    placeholder={
+                      dayModalTab === 'add_stock'
+                        ? 'e.g. Supplier delivery, Return to inventory, Restock'
+                        : 'e.g. Damaged items, Dispatch out, Inventory audit'
+                    }
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-[#1A1D26] border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange"
+                  />
+                </div>
+
+                {stockError && (
+                  <p className="text-xs text-rose-500 font-medium">{stockError}</p>
+                )}
+                {stockSuccess && (
+                  <p className="text-xs text-emerald-500 font-bold">{stockSuccess}</p>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDayModalTab('view')}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    isLoading={isSubmittingStock}
+                    className={dayModalTab === 'add_stock' ? '!bg-emerald-600 hover:!bg-emerald-700' : '!bg-rose-600 hover:!bg-rose-700'}
+                  >
+                    {dayModalTab === 'add_stock' ? 'Add Stock (+)' : 'Deduct Stock (-)'}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 4: ADD REMINDER */}
+            {dayModalTab === 'reminder' && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!reminderTitle.trim()) {
+                    setStockError('Reminder title is required');
+                    return;
+                  }
+                  try {
+                    await calendarService.addReminder(
+                      {
+                        title: reminderTitle.trim(),
+                        date: selectedDateStr,
+                        description: reminderNotes.trim(),
+                      },
+                      user?.name || 'Administrator'
+                    );
+                    setReminderTitle('');
+                    setReminderNotes('');
+                    setStockSuccess('Reminder saved successfully!');
+                    await loadEvents();
+                    setTimeout(() => {
+                      setDayModalTab('view');
+                    }, 800);
+                  } catch (err) {
+                    setStockError('Failed to save reminder');
+                  }
+                }}
+                className="space-y-3.5"
+              >
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Reminder / Milestone Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={reminderTitle}
+                    onChange={(e) => setReminderTitle(e.target.value)}
+                    placeholder="e.g. Call supplier for raw material dispatch"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-[#1A1D26] border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Additional Notes (Optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reminderNotes}
+                    onChange={(e) => setReminderNotes(e.target.value)}
+                    placeholder="Provide context or instructions for this milestone..."
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-[#1A1D26] border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-orange resize-none"
+                  />
+                </div>
+
+                {stockError && (
+                  <p className="text-xs text-rose-500 font-medium">{stockError}</p>
+                )}
+                {stockSuccess && (
+                  <p className="text-xs text-emerald-500 font-bold">{stockSuccess}</p>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDayModalTab('view')}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    className="!bg-amber-600 hover:!bg-amber-700"
+                  >
+                    Save Reminder
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </Modal>
+      )}
     </Card>
   );
 };

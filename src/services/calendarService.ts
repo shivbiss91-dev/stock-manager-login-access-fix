@@ -369,4 +369,25 @@ export const calendarService = {
     const filtered = reminders.filter((r) => r.id !== id);
     StorageService.set(STORAGE_KEYS.CALENDAR_EVENTS, filtered);
   },
+
+  /**
+   * Delete or remove an event/update for a specific day
+   */
+  async deleteEvent(eventId: string): Promise<boolean> {
+    if (eventId.startsWith('reminder-')) {
+      await this.deleteReminder(eventId);
+      return true;
+    }
+    if (eventId.startsWith('cal-mov-')) {
+      const movId = eventId.replace('cal-mov-', '');
+      const movements = StorageService.get<StockMovementRecord[]>(STORAGE_KEYS.MOVEMENTS, []);
+      const updated = movements.filter((m) => m.id !== movId);
+      StorageService.set(STORAGE_KEYS.MOVEMENTS, updated);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('stock_updated'));
+      }
+      return true;
+    }
+    return false;
+  },
 };

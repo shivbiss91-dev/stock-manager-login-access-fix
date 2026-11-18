@@ -184,7 +184,7 @@ export const AllItemsPage: React.FC = () => {
 
       {/* Filters and Search Bar */}
       <div className="bg-white dark:bg-[#12151D] border border-slate-200/80 dark:border-white/[0.06] rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row items-center gap-3">
+        <div className="flex items-center gap-3">
           {/* Search form */}
           <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -216,21 +216,6 @@ export const AllItemsPage: React.FC = () => {
               Search
             </button>
           </form>
-
-          {/* Category Dropdown */}
-          <div className="w-full md:w-56">
-            <select
-              value={categoryParam}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-[#1A1D26] border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-[#F2F4F8] focus:outline-none focus:ring-2 focus:ring-brand-orange capitalize"
-            >
-              <option value="all">All Product Categories</option>
-              <option value="card_holder">Card Holder</option>
-              <option value="lanyard">Lanyard</option>
-              <option value="hook">Hook</option>
-              <option value="button_bag">Button Bag</option>
-            </select>
-          </div>
         </div>
 
         {/* Stock Status Filter Tabs (Only In Stock & Out of Stock) */}
