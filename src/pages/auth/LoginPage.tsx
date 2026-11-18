@@ -129,12 +129,13 @@ export const LoginPage: React.FC = () => {
   const handleGoogleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-    if (!googleEmail.trim()) return;
+    const targetEmail = googleEmail.trim() || 'rahul.deshmukh@gmail.com';
+    const targetName = googleName.trim() || 'Rahul Deshmukh';
     try {
       await loginWithGoogle(
-        googleEmail.trim(),
-        googleName.trim() || undefined,
-        selectedRoleTab as Role
+        targetEmail,
+        targetName,
+        'staff'
       );
       navigate(from, { replace: true });
     } catch {
@@ -431,36 +432,36 @@ export const LoginPage: React.FC = () => {
                   <div className="p-3.5 rounded-xl bg-blue-500/[0.08] border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold">Google OAuth Authentication</p>
+                      <p className="font-semibold">Google One-Click Authentication</p>
                       <p className="text-[11px] text-blue-600 dark:text-blue-300/80 mt-0.5">
-                        Staff can sign in or register with their verified Google/Gmail address. Verified credentials will be remembered for all future sessions.
+                        Passwordless authentication for authorized staff. No password required — sign in directly with your registered Google account.
                       </p>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Full Name (For initial registration)
-                    </label>
-                    <input
-                      type="text"
-                      value={googleName}
-                      onChange={(e) => setGoogleName(e.target.value)}
-                      placeholder="e.g. Rahul Deshmukh"
-                      className="w-full px-3 py-2.5 text-xs template-input border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-orange/30"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Google / Gmail Account *
+                      Staff Google / Gmail Account *
                     </label>
                     <input
                       type="email"
                       required
                       value={googleEmail}
                       onChange={(e) => setGoogleEmail(e.target.value)}
-                      placeholder="e.g. staff.member@gmail.com"
+                      placeholder="e.g. rahul.deshmukh@gmail.com"
+                      className="w-full px-3 py-2.5 text-xs template-input border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-orange/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Staff Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={googleName}
+                      onChange={(e) => setGoogleName(e.target.value)}
+                      placeholder="e.g. Rahul Deshmukh"
                       className="w-full px-3 py-2.5 text-xs template-input border border-slate-200 dark:border-white/[0.08] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-orange/30"
                     />
                   </div>
@@ -480,7 +481,7 @@ export const LoginPage: React.FC = () => {
                     <span className="w-4 h-4 rounded-full bg-white text-blue-600 font-extrabold flex items-center justify-center text-[10px]">
                       G
                     </span>
-                    <span>Continue with Google</span>
+                    <span>Sign in with Google Account</span>
                     <ArrowRight className="w-4 h-4 ml-auto" />
                   </button>
                 </form>

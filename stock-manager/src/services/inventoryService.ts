@@ -14,6 +14,7 @@ import {
 } from '../utils/unitConversions';
 import { StorageService, STORAGE_KEYS } from './storageService';
 import { MASTER_INVENTORY } from '../data/inventorySeed';
+import { apiRequest } from './api';
 
 export interface StockAdjustmentInput {
   mode?: 'add' | 'deduct' | 'direct';
@@ -340,6 +341,21 @@ export const inventoryService = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('stock_updated', { detail: { itemId: item.id, date: adjustmentDateIso } }));
     }
+
+    // Sync with SQLite backend if available
+    try {
+      await apiRequest(`/items/${itemId}/stock`, 'POST', {
+        delta,
+        mode,
+        adjustmentQuantity: typeof deltaOrOptions === 'number' ? Math.abs(deltaOrOptions) : deltaOrOptions.adjustmentQuantity,
+        targetStock: typeof deltaOrOptions === 'object' ? deltaOrOptions.targetStock : undefined,
+        reason,
+        notes,
+        userName,
+        userRole,
+        date: typeof deltaOrOptions === 'object' ? deltaOrOptions.date : undefined,
+      });
+    } catch {}
 
     // Record in audit log
     try {

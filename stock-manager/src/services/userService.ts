@@ -2,6 +2,7 @@ import { User, Role, AppPermissionModule, DEFAULT_ROLE_MODULES, AuthSession } fr
 import { UserAccount } from '../data/users';
 import { StorageService, STORAGE_KEYS } from './storageService';
 import { auditLogService } from './auditLogService';
+import { apiRequest } from './api';
 
 function sanitizeUser(account: UserAccount): User {
   const { passwordHash, requiresOtp, otpCode, ...clean } = account;
@@ -10,20 +11,27 @@ function sanitizeUser(account: UserAccount): User {
 
 export const userService = {
   async getUsers(): Promise<User[]> {
-    await new Promise((res) => setTimeout(res, 30));
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    try {
+      const serverUsers = await apiRequest<User[]>('/users', 'GET');
+      if (serverUsers && Array.isArray(serverUsers)) {
+        return serverUsers;
+      }
+    } catch {
+      // Fallback to client storage
+    }
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     return accounts.map(sanitizeUser);
   },
 
   async getUserById(id: string): Promise<User | null> {
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     return user ? sanitizeUser(user) : null;
   },
 
   getUserByIdSync(id: string): User | null {
     try {
-      const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+      const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
       const user = accounts.find((u) => u.id === id);
       return user ? sanitizeUser(user) : null;
     } catch {
@@ -39,7 +47,7 @@ export const userService = {
       throw new Error('Unauthorized. Only administrators can modify roles and permissions.');
     }
 
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     if (!user) throw new Error('User not found');
 
@@ -59,7 +67,7 @@ export const userService = {
       user.permissions = [...DEFAULT_ROLE_MODULES[newRole]];
     }
 
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     // Update active session if target user is currently logged in
     const activeSession = StorageService.get<AuthSession | null>(STORAGE_KEYS.SESSION, null);
@@ -100,14 +108,14 @@ export const userService = {
       throw new Error('Unauthorized. Only administrators can modify staff permissions.');
     }
 
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     if (!user) throw new Error('User not found');
 
     const previousPerms = user.permissions || DEFAULT_ROLE_MODULES[user.role] || [];
     user.permissions = [...permissions];
 
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     // Synchronize active session if this user is logged in
     const activeSession = StorageService.get<AuthSession | null>(STORAGE_KEYS.SESSION, null);
@@ -136,12 +144,12 @@ export const userService = {
 
   async toggleUserStatus(id: string): Promise<User> {
     await new Promise((res) => setTimeout(res, 40));
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     if (!user) throw new Error('User not found');
 
     user.status = user.status === 'active' ? 'suspended' : 'active';
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     // If suspended/deactivated, revoke active session
     if (user.status !== 'active') {
@@ -165,12 +173,12 @@ export const userService = {
       throw new Error('You cannot deactivate your own active administrative account.');
     }
 
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     if (!user) throw new Error('User not found');
 
     user.status = 'deactivated';
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     // Immediately revoke any active session for this user
     const activeSession = StorageService.get<AuthSession | null>(STORAGE_KEYS.SESSION, null);
@@ -203,12 +211,12 @@ export const userService = {
       throw new Error('Unauthorized. Only administrators can reactivate accounts.');
     }
 
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     if (!user) throw new Error('User not found');
 
     user.status = 'active';
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     try {
       await auditLogService.logAction({
@@ -234,12 +242,12 @@ export const userService = {
       throw new Error('Unauthorized. Only administrators can approve accounts.');
     }
 
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     if (!user) throw new Error('User not found');
 
     user.status = 'active';
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     try {
       await auditLogService.logAction({
@@ -261,12 +269,12 @@ export const userService = {
   async rejectUser(id: string, adminUser?: User): Promise<User> {
     await new Promise((res) => setTimeout(res, 40));
 
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const user = accounts.find((u) => u.id === id);
     if (!user) throw new Error('User not found');
 
     user.status = 'deactivated';
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     try {
       await auditLogService.logAction({
@@ -287,7 +295,7 @@ export const userService = {
 
   async createUser(userData: Omit<User, 'id'> & { password?: string }): Promise<User> {
     await new Promise((res) => setTimeout(res, 50));
-    const accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
 
     // Check duplicate email
     const exists = accounts.some((u) => u.email.toLowerCase() === userData.email.trim().toLowerCase());
@@ -309,7 +317,7 @@ export const userService = {
     };
 
     accounts.push(newAccount);
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     return sanitizeUser(newAccount);
   },
@@ -320,12 +328,18 @@ export const userService = {
       throw new Error('You cannot delete your own administrative account.');
     }
 
-    let accounts = StorageService.get<UserAccount[]>(STORAGE_KEYS.USERS, []);
+    try {
+      await apiRequest(`/users/${id}`, 'DELETE');
+    } catch {
+      // Fallback to local storage update
+    }
+
+    let accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     const target = accounts.find((u) => u.id === id);
     if (!target) return false;
 
     accounts = accounts.filter((u) => u.id !== id);
-    StorageService.set(STORAGE_KEYS.USERS, accounts);
+    StorageService.setProduction(STORAGE_KEYS.USERS, accounts);
 
     // If active session belongs to deleted user, clear it
     const activeSession = StorageService.get<AuthSession | null>(STORAGE_KEYS.SESSION, null);
@@ -352,6 +366,6 @@ export const userService = {
    * Helper for test suites to seed test user accounts
    */
   _seedUsersForTesting(testUsers: UserAccount[]): void {
-    StorageService.set(STORAGE_KEYS.USERS, testUsers);
+    StorageService.setProduction(STORAGE_KEYS.USERS, testUsers);
   },
 };

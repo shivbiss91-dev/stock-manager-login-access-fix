@@ -61,6 +61,22 @@ export const backupService = {
     };
   },
 
+  validateSnapshot(fileContent: string): {
+    success: boolean;
+    metadata?: DatabaseSnapshot['metadata'];
+    error?: string;
+  } {
+    try {
+      const parsed = JSON.parse(fileContent) as DatabaseSnapshot;
+      if (!parsed.version || !parsed.data || !parsed.metadata) {
+        return { success: false, error: 'Invalid database snapshot format. Missing required root properties.' };
+      }
+      return { success: true, metadata: parsed.metadata };
+    } catch {
+      return { success: false, error: 'Failed to parse JSON file. File is corrupt or not valid JSON.' };
+    }
+  },
+
   async restoreSnapshot(fileContent: string): Promise<{
     success: boolean;
     metadata?: DatabaseSnapshot['metadata'];

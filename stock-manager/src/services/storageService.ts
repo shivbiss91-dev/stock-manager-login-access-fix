@@ -129,25 +129,31 @@ export class StorageService {
           legacyKeys.forEach((key) => localStorage.removeItem(key));
         }
 
-        // Initialize clean starter collections: exactly the four starter products for items, clean empty for all transactions/parties
-        storage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(STARTER_PRODUCTS));
-        storage.setItem(STORAGE_KEYS.WAREHOUSES, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.PURCHASES, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.GRN, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.SUPPLIER_BILLS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.TRANSFERS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.QUOTATIONS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.SALES_ORDERS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.RETURNS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.MOVEMENTS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.APPROVALS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify([]));
-        storage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+        // Initialize clean starter collections only if they do not already exist (never overwrite saved data)
+        const setIfMissing = (key: string, defaultValue: unknown) => {
+          if (storage.getItem(key) === null) {
+            storage.setItem(key, JSON.stringify(defaultValue));
+          }
+        };
+
+        setIfMissing(STORAGE_KEYS.USERS, []);
+        setIfMissing(STORAGE_KEYS.ITEMS, STARTER_PRODUCTS);
+        setIfMissing(STORAGE_KEYS.WAREHOUSES, []);
+        setIfMissing(STORAGE_KEYS.CUSTOMERS, []);
+        setIfMissing(STORAGE_KEYS.SUPPLIERS, []);
+        setIfMissing(STORAGE_KEYS.PURCHASES, []);
+        setIfMissing(STORAGE_KEYS.GRN, []);
+        setIfMissing(STORAGE_KEYS.SUPPLIER_BILLS, []);
+        setIfMissing(STORAGE_KEYS.TRANSFERS, []);
+        setIfMissing(STORAGE_KEYS.QUOTATIONS, []);
+        setIfMissing(STORAGE_KEYS.SALES_ORDERS, []);
+        setIfMissing(STORAGE_KEYS.RETURNS, []);
+        setIfMissing(STORAGE_KEYS.INVOICES, []);
+        setIfMissing(STORAGE_KEYS.MOVEMENTS, []);
+        setIfMissing(STORAGE_KEYS.APPROVALS, []);
+        setIfMissing(STORAGE_KEYS.AUDIT, []);
+        setIfMissing(STORAGE_KEYS.DOCUMENTS, []);
+        setIfMissing(STORAGE_KEYS.NOTIFICATIONS, []);
 
         storage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
         storage.setItem(STORAGE_KEYS.STARTER_SEEDED, 'true');
@@ -228,6 +234,28 @@ export class StorageService {
    */
   static resetDemoWorkspace(): void {
     this.seedDemoWorkspace(true);
+  }
+
+  static getProduction<T>(key: string, defaultValue: T): T {
+    try {
+      this.init();
+      const storage = this.getStorage();
+      const raw = storage.getItem(key);
+      if (raw === null) return defaultValue;
+      return JSON.parse(raw) as T;
+    } catch {
+      return defaultValue;
+    }
+  }
+
+  static setProduction<T>(key: string, value: T): void {
+    try {
+      this.init();
+      const storage = this.getStorage();
+      storage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(`Failed to persist production key "${key}":`, e);
+    }
   }
 
   static get<T>(key: string, defaultValue: T): T {

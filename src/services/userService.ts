@@ -2,6 +2,7 @@ import { User, Role, AppPermissionModule, DEFAULT_ROLE_MODULES, AuthSession } fr
 import { UserAccount } from '../data/users';
 import { StorageService, STORAGE_KEYS } from './storageService';
 import { auditLogService } from './auditLogService';
+import { apiRequest } from './api';
 
 function sanitizeUser(account: UserAccount): User {
   const { passwordHash, requiresOtp, otpCode, ...clean } = account;
@@ -10,7 +11,14 @@ function sanitizeUser(account: UserAccount): User {
 
 export const userService = {
   async getUsers(): Promise<User[]> {
-    await new Promise((res) => setTimeout(res, 30));
+    try {
+      const serverUsers = await apiRequest<User[]>('/users', 'GET');
+      if (serverUsers && Array.isArray(serverUsers)) {
+        return serverUsers;
+      }
+    } catch {
+      // Fallback to client storage
+    }
     const accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);
     return accounts.map(sanitizeUser);
   },
@@ -318,6 +326,12 @@ export const userService = {
     await new Promise((res) => setTimeout(res, 40));
     if (adminUser && adminUser.id === id) {
       throw new Error('You cannot delete your own administrative account.');
+    }
+
+    try {
+      await apiRequest(`/users/${id}`, 'DELETE');
+    } catch {
+      // Fallback to local storage update
     }
 
     let accounts = StorageService.getProduction<UserAccount[]>(STORAGE_KEYS.USERS, []);

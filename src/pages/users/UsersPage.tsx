@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Smartphone,
   Lock,
+  Trash2,
 } from 'lucide-react';
 import { userService } from '../../services/userService';
 import { auditLogService } from '../../services/auditLogService';
@@ -54,6 +55,7 @@ export const UsersPage: React.FC = () => {
   const [selectedPermissions, setSelectedPermissions] = useState<AppPermissionModule[]>([]);
 
   const [deactivatingUser, setDeactivatingUser] = useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
 
   const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
@@ -224,6 +226,27 @@ export const UsersPage: React.FC = () => {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Reactivation failed';
       addNotification({ title: 'Error', message: msg, type: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Permanently Delete User Account (SQLite & Storage)
+  const handleConfirmDeleteUser = async () => {
+    if (!deletingUser) return;
+    setIsSubmitting(true);
+    try {
+      await userService.deleteUser(deletingUser.id, currentUser || undefined);
+      setUsers(users.filter((u) => u.id !== deletingUser.id));
+      addNotification({
+        title: 'User Permanently Deleted',
+        message: `${deletingUser.name} (${deletingUser.email}) was removed from the database.`,
+        type: 'success',
+      });
+      setDeletingUser(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Deletion failed';
+      addNotification({ title: 'Delete Failed', message: msg, type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -772,6 +795,17 @@ export const UsersPage: React.FC = () => {
                                     <RotateCcw className="w-3.5 h-3.5" />
                                   </button>
                                 )}
+
+                                {/* Permanently Delete User Account */}
+                                {!isSelf && u.email !== 'admin@stockvista.in' && (
+                                  <button
+                                    onClick={() => setDeletingUser(u)}
+                                    className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
+                                    title="Permanently delete user account from database"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <span className="text-[11px] text-slate-400">Admin Only</span>
@@ -1185,6 +1219,58 @@ export const UsersPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Permanently Delete User Confirmation Modal */}
+      {deletingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md template-card border border-rose-500/30 rounded-[24px] shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center gap-2.5 text-rose-500">
+              <div className="p-2 bg-rose-500/10 rounded-xl">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Permanently Delete User
+              </h3>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Are you sure you want to permanently delete{' '}
+              <strong className="text-slate-800 dark:text-slate-200">{deletingUser.name}</strong> (
+              <span className="font-mono text-accent-orange">{deletingUser.email}</span>)?
+            </p>
+
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                This action is irreversible.
+              </p>
+              <p className="text-[11px] text-rose-500/90">
+                The account will be deleted from the SQLite database immediately, and active sessions will be terminated.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setDeletingUser(null)}
+                disabled={isSubmitting}
+                className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05] rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleConfirmDeleteUser}
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isSubmitting ? 'Deleting...' : 'Yes, Delete Account'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
