@@ -6,7 +6,22 @@
 
 export const API_BASE = '/api';
 
+export function isStaticHosting(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return (
+    hostname.endsWith('github.io') ||
+    hostname.endsWith('pages.dev') ||
+    hostname.endsWith('web.app') ||
+    hostname.endsWith('vercel.app') ||
+    hostname.endsWith('netlify.app')
+  );
+}
+
 export async function isServerAvailable(): Promise<boolean> {
+  if (isStaticHosting()) {
+    return false;
+  }
   try {
     const res = await fetch(`${API_BASE}/health`, { method: 'GET', signal: AbortSignal.timeout(1500) });
     return res.ok;
@@ -20,6 +35,12 @@ export async function apiRequest<T>(
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'GET',
   body?: unknown
 ): Promise<T | null> {
+  if (isStaticHosting()) {
+    // In static hosting environments like GitHub Pages, no backend server is running.
+    // Throw immediately to prevent HTTP 405 Method Not Allowed network errors in console.
+    throw new Error('Backend server is not available in static hosting environment');
+  }
+
   try {
     const res = await fetch(`${API_BASE}${endpoint}`, {
       method,

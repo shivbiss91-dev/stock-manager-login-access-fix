@@ -457,9 +457,6 @@ export const ItemDetailPage: React.FC = () => {
                 <span className="text-xs font-normal text-slate-500">{item.unit}</span>
               </button>
 
-              <p className="text-[10px] text-slate-400 font-mono mt-0.5" title="Packaging breakdown equivalent">
-                ≈ {formatPackagingBreakdown(item.currentStock, item.packagingConversions)}
-              </p>
               <p className="text-[10px] text-slate-400 mt-0.5">
                 Reorder: <strong>{item.reorderLevel} {item.unit}</strong> • PO Qty:{' '}
                 <strong>{item.reorderQuantity || item.reorderLevel * 2} {item.unit}</strong>
