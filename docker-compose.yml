@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  stockvista:
+    build: .
+    container_name: stockvista-server
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+    volumes:
+      # Mount data folder to persist SQLite database on host machine
+      - ./data:/app/data

@@ -1,0 +1,20 @@
+[Unit]
+Description=StockVista Inventory & SQLite Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/stockvista
+ExecStart=/usr/bin/node /var/www/stockvista/server.js
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=stockvista
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=HOST=0.0.0.0
+
+[Install]
+WantedBy=multi-user.target

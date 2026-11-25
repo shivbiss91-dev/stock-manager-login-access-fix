@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Security: Protect SQLite database directory from direct browser downloads
+  RewriteRule ^data/ - [F,L]
+
+  # Route SPA paths to index.html if file doesn't exist
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^.*$ /index.html [L]
+</IfModule>
