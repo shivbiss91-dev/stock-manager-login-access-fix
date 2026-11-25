@@ -1,5 +1,7 @@
 import { StockMovementRecord, MovementType } from '../types/itemDetail';
 import { StorageService, STORAGE_KEYS } from './storageService';
+import { auditLogService } from './auditLogService';
+import { apiRequest } from './api';
 
 export interface MovementFilterOptions {
   itemId?: string;
@@ -143,6 +145,173 @@ export const stockMovementService = {
     list.unshift(newRecord);
     StorageService.set(STORAGE_KEYS.MOVEMENTS, list);
     return newRecord;
+  },
+
+  /**
+   * Updates an existing movement record and recalculates the item's current stock
+   * by applying only the net delta difference (newDelta - oldDelta),
+   * guaranteeing that the previous quantity is replaced without double-applying.
+   */
+  async updateMovement(
+    movementId: string,
+    updates: {
+      quantityDelta: number;
+      reason?: string;
+      notes?: string;
+      date?: string;
+      userName?: string;
+      userRole?: string;
+    }
+  ): Promise<{ movement: StockMovementRecord; updatedStock: number }> {
+    await new Promise((res) => setTimeout(res, 20));
+    let list = StorageService.get<StockMovementRecord[]>(STORAGE_KEYS.MOVEMENTS, []);
+    let movementIndex = list.findIndex((m) => m.id === movementId);
+
+    if (movementIndex === -1) {
+      const allMovements = await this.getMovements();
+      const found = allMovements.find((m) => m.id === movementId);
+      if (found) {
+        list = [...allMovements];
+        movementIndex = list.findIndex((m) => m.id === movementId);
+      }
+    }
+
+    if (movementIndex === -1) {
+      throw new Error('Movement record not found.');
+    }
+
+    const oldMovement = list[movementIndex];
+    const items = StorageService.get<any[]>(STORAGE_KEYS.ITEMS, []);
+    const itemIndex = items.findIndex((i) => i.id === oldMovement.itemId);
+    if (itemIndex === -1) {
+      throw new Error('Associated item not found in catalog.');
+    }
+
+    const item = items[itemIndex];
+    const oldDelta = oldMovement.quantityDelta;
+    const newDelta = updates.quantityDelta;
+    // Difference between new delta and old delta: recalculates stock without double-applying
+    const deltaDifference = newDelta - oldDelta;
+
+    const newCurrentStock = item.currentStock + deltaDifference;
+    if (newCurrentStock < 0) {
+      throw new Error(
+        `Cannot adjust movement: resulting stock would become negative (${newCurrentStock} ${item.unit}). Available: ${item.currentStock} ${item.unit}.`
+      );
+    }
+
+    // 1. Recalculate item stock safely without double-applying
+    const oldItemStock = item.currentStock;
+    item.currentStock = newCurrentStock;
+    item.updatedAt = new Date().toISOString();
+    StorageService.set(STORAGE_KEYS.ITEMS, items);
+
+    // 2. Update movement record in ledger
+    const updatedMovement: StockMovementRecord = {
+      ...oldMovement,
+      quantityDelta: newDelta,
+      type: newDelta >= 0 ? (oldMovement.type === 'adjustment' ? 'adjustment' : 'in') : (oldMovement.type === 'adjustment' ? 'adjustment' : 'out'),
+      stockAfter: (oldMovement.stockBefore ?? (oldItemStock - oldDelta)) + newDelta,
+      reason: updates.reason !== undefined ? updates.reason : oldMovement.reason,
+      notes: updates.notes !== undefined ? updates.notes : oldMovement.notes,
+      date: updates.date || oldMovement.date,
+      userName: updates.userName || oldMovement.userName,
+      userRole: updates.userRole || oldMovement.userRole,
+    };
+    list[movementIndex] = updatedMovement;
+    StorageService.set(STORAGE_KEYS.MOVEMENTS, list);
+
+    // 3. Sync with SQLite backend if available
+    try {
+      await apiRequest(`/items/${item.id}/stock`, 'POST', {
+        delta: deltaDifference,
+        mode: deltaDifference >= 0 ? 'add' : 'deduct',
+        adjustmentQuantity: Math.abs(deltaDifference),
+        reason: `Movement Record Edit: ${oldMovement.referenceNumber} (${oldDelta >= 0 ? '+' : ''}${oldDelta} -> ${newDelta >= 0 ? '+' : ''}${newDelta})`,
+        notes: updates.notes || 'Movement recalculated without double-applying previous change',
+        userName: updates.userName || oldMovement.userName,
+        userRole: updates.userRole || oldMovement.userRole,
+        date: updates.date,
+      });
+    } catch {}
+
+    // 4. Audit Log
+    try {
+      await auditLogService.logAction({
+        module: 'inventory',
+        action: 'stock_adjusted',
+        targetId: item.id,
+        targetDescription: `${item.name} (${item.sku})`,
+        userName: updates.userName || oldMovement.userName,
+        userRole: updates.userRole || oldMovement.userRole,
+        oldValue: `${oldItemStock} ${item.unit} [Movement delta: ${oldDelta >= 0 ? '+' : ''}${oldDelta}]`,
+        newValue: `${newCurrentStock} ${item.unit} [Movement delta: ${newDelta >= 0 ? '+' : ''}${newDelta}]`,
+        metadata: {
+          movementId,
+          referenceNumber: oldMovement.referenceNumber,
+          oldDelta,
+          newDelta,
+          deltaDifference,
+          oldItemStock,
+          newCurrentStock,
+        },
+      });
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('stock_updated', {
+          detail: { itemId: item.id, date: updatedMovement.date },
+        })
+      );
+    }
+
+    return { movement: updatedMovement, updatedStock: newCurrentStock };
+  },
+
+  async deleteMovement(
+    movementId: string,
+    userName?: string,
+    userRole?: string
+  ): Promise<{ deletedId: string; updatedStock: number }> {
+    await new Promise((res) => setTimeout(res, 20));
+    const list = StorageService.get<StockMovementRecord[]>(STORAGE_KEYS.MOVEMENTS, []);
+    const movementIndex = list.findIndex((m) => m.id === movementId);
+    if (movementIndex === -1) {
+      throw new Error('Movement record not found.');
+    }
+
+    const oldMovement = list[movementIndex];
+    const items = StorageService.get<any[]>(STORAGE_KEYS.ITEMS, []);
+    const itemIndex = items.findIndex((i) => i.id === oldMovement.itemId);
+    if (itemIndex === -1) {
+      throw new Error('Associated item not found in catalog.');
+    }
+
+    const item = items[itemIndex];
+    const reversedStock = item.currentStock - oldMovement.quantityDelta;
+    if (reversedStock < 0) {
+      throw new Error(
+        `Cannot delete movement: reversing would make stock negative (${reversedStock} ${item.unit}).`
+      );
+    }
+
+    item.currentStock = reversedStock;
+    item.updatedAt = new Date().toISOString();
+    StorageService.set(STORAGE_KEYS.ITEMS, items);
+
+    list.splice(movementIndex, 1);
+    StorageService.set(STORAGE_KEYS.MOVEMENTS, list);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('stock_updated', {
+          detail: { itemId: item.id, date: oldMovement.date },
+        })
+      );
+    }
+
+    return { deletedId: movementId, updatedStock: reversedStock };
   },
 
   _seedMovementsForTesting(records: StockMovementRecord[]): void {

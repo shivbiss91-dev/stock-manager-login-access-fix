@@ -23,15 +23,23 @@ import {
   Minus,
   Sliders,
   Trash2,
+  History,
+  RefreshCw,
+  ArrowUpRight,
+  ArrowDownRight,
+  Filter,
 } from 'lucide-react';
 import { QuickStockAdjustmentModal } from '../../components/dashboard/QuickStockAdjustmentModal';
+import { EditMovementModal } from '../../components/itemDetail/EditMovementModal';
+import { stockMovementService } from '../../services/stockMovementService';
+import { StockMovementRecord } from '../../types/itemDetail';
 import { formatPackagingBreakdown } from '../../utils/unitConversions';
 import { inventoryService } from '../../services/inventoryService';
 import { ComputedInventoryItem } from '../../types/inventory';
 import { useAuthStore } from '../../store/authStore';
 import { formatINR } from '../../utils/formatINR';
 import { formatCategoryName } from '../../data/materialCategories';
-import { formatDate } from '../../utils/dateUtils';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import { EditItemModal } from '../../components/itemDetail/EditItemModal';
 import { ProductImage } from '../../components/common/ProductImage';
 import { TransferStockModal } from '../../components/itemDetail/TransferStockModal';
@@ -61,6 +69,27 @@ export const ItemDetailPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [adjustmentMode, setAdjustmentMode] = useState<'add' | 'deduct' | 'direct'>('add');
 
+  // Movement history state
+  const [movements, setMovements] = useState<StockMovementRecord[]>([]);
+  const [isLoadingMovements, setIsLoadingMovements] = useState(false);
+  const [movementFilter, setMovementFilter] = useState<'all' | 'add' | 'deduct' | 'adjustment'>('all');
+  const [editingMovement, setEditingMovement] = useState<StockMovementRecord | null>(null);
+  const [isEditMovementModalOpen, setIsEditMovementModalOpen] = useState(false);
+
+  const loadMovements = async (targetItemId?: string) => {
+    const id = targetItemId || itemId;
+    if (!id) return;
+    setIsLoadingMovements(true);
+    try {
+      const data = await stockMovementService.getMovements({ itemId: id });
+      setMovements(data);
+    } catch (err) {
+      console.error('Failed to load item movements:', err);
+    } finally {
+      setIsLoadingMovements(false);
+    }
+  };
+
   const handleDeleteItem = async () => {
     if (!item) return;
     setIsDeleting(true);
@@ -84,9 +113,19 @@ export const ItemDetailPage: React.FC = () => {
     if (!itemId) return;
     const reloaded = await inventoryService.getItemById(itemId);
     if (reloaded) setItem(reloaded);
+    await loadMovements(itemId);
   };
 
-  // Load item data
+  const handleMovementUpdated = async () => {
+    if (!itemId) return;
+    const reloaded = await inventoryService.getItemById(itemId);
+    if (reloaded) setItem(reloaded);
+    await loadMovements(itemId);
+    setIsEditMovementModalOpen(false);
+    setEditingMovement(null);
+  };
+
+  // Load item data & movements
   useEffect(() => {
     let isMounted = true;
     async function loadItem() {
@@ -105,10 +144,30 @@ export const ItemDetailPage: React.FC = () => {
     }
 
     loadItem();
+    loadMovements(itemId);
+
+    const handleStockUpdate = (e: any) => {
+      if (!itemId || (e.detail?.itemId && e.detail.itemId !== itemId)) return;
+      inventoryService.getItemById(itemId).then((reloaded) => {
+        if (reloaded) setItem(reloaded);
+      });
+      loadMovements(itemId);
+    };
+
+    window.addEventListener('stock_updated', handleStockUpdate);
     return () => {
       isMounted = false;
+      window.removeEventListener('stock_updated', handleStockUpdate);
     };
   }, [itemId]);
+
+  const filteredMovements = useMemo(() => {
+    if (movementFilter === 'all') return movements;
+    if (movementFilter === 'add') return movements.filter((m) => m.quantityDelta > 0);
+    if (movementFilter === 'deduct') return movements.filter((m) => m.quantityDelta < 0);
+    if (movementFilter === 'adjustment') return movements.filter((m) => m.type === 'adjustment');
+    return movements;
+  }, [movements, movementFilter]);
 
   // Margin calculation for Admin
   const profitMarginPercent = useMemo(() => {
@@ -456,6 +515,240 @@ export const ItemDetailPage: React.FC = () => {
 
 
 
+      {/* 3. Item-Specific Stock Movement & Calibration History */}
+      <div className="template-card border border-slate-200 dark:border-white/[0.06] rounded-[20px] p-5 sm:p-6 shadow-soft space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-accent-orange/10 text-accent-orange">
+              <History className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  Stock Movement & Calibration History
+                </h2>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300">
+                  {movements.length} {movements.length === 1 ? 'Record' : 'Records'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Item-specific audit ledger: additions (+), deductions (-), transfers, and calibrations with live stock recalculation.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filter buttons */}
+            <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] text-xs">
+              <button
+                type="button"
+                onClick={() => setMovementFilter('all')}
+                className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                  movementFilter === 'all'
+                    ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setMovementFilter('add')}
+                className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                  movementFilter === 'add'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-emerald-500'
+                }`}
+              >
+                + Additions
+              </button>
+              <button
+                type="button"
+                onClick={() => setMovementFilter('deduct')}
+                className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                  movementFilter === 'deduct'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-rose-500'
+                }`}
+              >
+                - Deductions
+              </button>
+              <button
+                type="button"
+                onClick={() => setMovementFilter('adjustment')}
+                className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                  movementFilter === 'adjustment'
+                    ? 'bg-accent-blue text-white shadow-sm'
+                    : 'text-slate-500 hover:text-blue-500'
+                }`}
+              >
+                Calibrations
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => loadMovements(item.id)}
+              disabled={isLoadingMovements}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-white/[0.08] hover:bg-slate-100 dark:hover:bg-white/[0.05] text-slate-500 transition cursor-pointer"
+              title="Refresh ledger records"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoadingMovements ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Ledger Table */}
+        {filteredMovements.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-slate-400 font-semibold">
+                  <th className="pb-2.5 pr-3">Date & Time</th>
+                  <th className="pb-2.5 px-3">Operation / Type</th>
+                  <th className="pb-2.5 px-3">Adjustment Delta</th>
+                  <th className="pb-2.5 px-3">Resulting Balance</th>
+                  <th className="pb-2.5 px-3">Reference / Reason</th>
+                  <th className="pb-2.5 px-3">Authorized By</th>
+                  <th className="pb-2.5 pl-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/[0.04]">
+                {filteredMovements.map((mov) => {
+                  const isPositive = mov.quantityDelta > 0;
+                  const isNegative = mov.quantityDelta < 0;
+                  return (
+                    <tr
+                      key={mov.id}
+                      className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
+                    >
+                      {/* Date & Time */}
+                      <td className="py-3 pr-3 text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{formatDateTime(mov.date)}</span>
+                        </div>
+                      </td>
+
+                      {/* Operation / Type Badge */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold text-[11px] ${
+                            isPositive
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                              : isNegative
+                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                              : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                          }`}
+                        >
+                          {isPositive ? (
+                            <ArrowUpRight className="w-3 h-3" />
+                          ) : isNegative ? (
+                            <ArrowDownRight className="w-3 h-3" />
+                          ) : (
+                            <ArrowRightLeft className="w-3 h-3" />
+                          )}
+                          <span className="capitalize">
+                            {isPositive
+                              ? 'Stock Addition (+)'
+                              : isNegative
+                              ? 'Stock Deduction (-)'
+                              : 'Stock Calibration'}
+                          </span>
+                        </span>
+                      </td>
+
+                      {/* Quantity Delta */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span
+                          className={`text-sm font-extrabold font-mono ${
+                            isPositive
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : isNegative
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {isPositive ? `+${mov.quantityDelta}` : mov.quantityDelta}{' '}
+                          <span className="text-xs font-semibold">{mov.unit || item.unit}</span>
+                        </span>
+                      </td>
+
+                      {/* Resulting Balance */}
+                      <td className="py-3 px-3 text-slate-900 dark:text-white font-bold whitespace-nowrap">
+                        {mov.stockAfter !== undefined
+                          ? `${mov.stockAfter.toLocaleString('en-IN')} ${mov.unit || item.unit}`
+                          : '-'}
+                      </td>
+
+                      {/* Reason / Reference */}
+                      <td className="py-3 px-3 max-w-xs">
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                          {mov.reason || mov.notes || 'Manual stock update'}
+                        </p>
+                        <p className="text-[11px] text-slate-400 truncate font-mono">
+                          Ref: {mov.referenceNumber}
+                          {mov.notes && mov.notes !== mov.reason ? ` • ${mov.notes}` : ''}
+                        </p>
+                      </td>
+
+                      {/* Authorized By */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <p className="font-medium text-slate-700 dark:text-slate-300">
+                          {mov.userName || 'Authorized Staff'}
+                        </p>
+                        <span className="text-[10px] text-slate-400 capitalize">
+                          {mov.userRole || 'Staff'}
+                        </span>
+                      </td>
+
+                      {/* Action: Edit */}
+                      <td className="py-3 pl-3 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingMovement(mov);
+                            setIsEditMovementModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-white/[0.04] hover:bg-accent-orange/10 hover:border-accent-orange/30 text-slate-700 dark:text-slate-300 hover:text-accent-orange transition-all font-semibold flex items-center gap-1.5 ml-auto cursor-pointer"
+                          title="Edit this addition/deduction and recalculate stock without double-applying"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-accent-orange" />
+                          <span>Edit</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-dashed border-slate-200 dark:border-white/[0.08] space-y-3">
+            <Package className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600" />
+            <div>
+              <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">
+                No Stock Movements Recorded
+              </p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto mt-0.5">
+                Every confirmed addition, deduction, transfer, and calibration for this product will appear here in chronological order.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setAdjustmentMode('add');
+                setIsAdjustmentModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-accent-orange text-white hover:bg-accent-orange/90 transition shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Record First Stock Addition / Deduction</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Modals */}
       {isEditModalOpen && (
         <EditItemModal
@@ -532,6 +825,19 @@ export const ItemDetailPage: React.FC = () => {
           initialMode={adjustmentMode}
           onClose={() => setIsAdjustmentModalOpen(false)}
           onSuccess={handleAdjustmentSuccess}
+        />
+      )}
+
+      {isEditMovementModalOpen && editingMovement && (
+        <EditMovementModal
+          movement={editingMovement}
+          item={item}
+          isOpen={isEditMovementModalOpen}
+          onClose={() => {
+            setIsEditMovementModalOpen(false);
+            setEditingMovement(null);
+          }}
+          onSuccess={handleMovementUpdated}
         />
       )}
     </div>

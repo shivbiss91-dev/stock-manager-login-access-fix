@@ -280,16 +280,15 @@ export const inventoryService = {
       userRole = opts.userRole || 'Staff';
       referenceNumber = opts.referenceNumber || `ADJ-${Date.now().toString().slice(-6)}`;
 
-      const conv = item.packagingConversions || DEFAULT_PACKAGING_CONVERSIONS;
-
       if (mode === 'direct') {
         const target = opts.targetStock !== undefined ? opts.targetStock : (opts.adjustmentQuantity ?? previousStock);
-        const targetInBase = convertToBaseQuantity(target, unit, conv);
-        delta = targetInBase - previousStock;
+        delta = target - previousStock;
+      } else if (opts.delta !== undefined) {
+        // Direct 1:1 delta entered by user in the item's unit without any hidden unit multiplier
+        delta = opts.delta;
       } else {
-        const rawQty = opts.adjustmentQuantity !== undefined ? opts.adjustmentQuantity : Math.abs(opts.delta || 0);
-        const qtyInBase = convertToBaseQuantity(rawQty, unit, conv);
-        delta = mode === 'deduct' ? -qtyInBase : qtyInBase;
+        const rawQty = opts.adjustmentQuantity !== undefined ? opts.adjustmentQuantity : 0;
+        delta = mode === 'deduct' ? -rawQty : rawQty;
       }
     }
 
